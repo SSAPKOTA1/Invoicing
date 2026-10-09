@@ -29,22 +29,17 @@ def run_selfcheck(verbose: bool = True) -> int:
             if not storage.db.integrity_ok():
                 say("integrity check failed")
                 return 1
-            try:
-                from supplier_app.views.selfcheck_ui import check_all_screens
-            except ImportError:
-                say("UI not available yet; skipping screens")
-            else:
-                from supplier_app.main import build_context
+            from supplier_app.main import build_context
+            from supplier_app.selfcheck_ui import check_all_screens
 
-                storage.close()
-                ctx = build_context(AppPaths(Path(tmp) / "ui"))
-                try:
-                    count = check_all_screens(ctx)
-                finally:
-                    ctx.close()
-                say(f"{count} screen/theme combinations built offscreen")
-                return 0
             storage.close()
+            ctx = build_context(AppPaths(Path(tmp) / "ui"))
+            try:
+                ctx.demo.load()
+                count = check_all_screens(ctx)
+            finally:
+                ctx.close()
+            say(f"{count} screen/theme combinations built offscreen")
         return 0
     except Exception as exc:  # noqa: BLE001 - report any failure as exit code 1
         log.exception("selfcheck failed")

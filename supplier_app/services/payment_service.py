@@ -31,6 +31,7 @@ from supplier_app.services.ledger import (
 )
 from supplier_app.services.ledger_service import LedgerService
 from supplier_app.services.settings_service import SettingsService
+from supplier_app.util.money import format_cents
 from supplier_app.util.normalize import normalize_iban, normalize_reference
 
 ManualAllocation = Sequence[tuple[int, AllocationComponent, int]]
@@ -139,7 +140,7 @@ class PaymentService(ServiceBase):
                         self.repos.references.add(DocumentReference(
                             EntityKind.INVOICE.value, invoice_id, ReferenceType.PAYMENT_REFERENCE,
                             bank_reference.strip(), norm))
-            self._audit("create", "payment", payment.id, f"{amount_cents}")
+            self._audit("create", "payment", payment.id, f"{format_cents(amount_cents)} {payment.bank_reference}".strip())
         return payment
 
     def _book_allocations(

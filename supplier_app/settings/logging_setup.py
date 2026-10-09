@@ -21,3 +21,12 @@ def setup_logging(log_dir: Path, level: int = logging.INFO) -> None:
     handler = RotatingFileHandler(target, maxBytes=1_000_000, backupCount=5, encoding="utf-8")
     handler.setFormatter(logging.Formatter(_FMT))
     root.addHandler(handler)
+
+
+def shutdown_logging() -> None:
+    """Close and detach the rotating file handlers (needed before deleting the log folder on Windows)."""
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        if isinstance(h, RotatingFileHandler):
+            h.close()
+            root.removeHandler(h)

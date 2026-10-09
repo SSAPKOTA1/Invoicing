@@ -13,3 +13,8 @@
 11. Court costs are booked as `COLLECTION_COST` (no separate ledger type); `ReferenceType` labels are matched case-insensitively and tolerate one OCR-inserted space inside compound words.
 12. Modules named `types.py` were avoided (they shadow the stdlib when a script runs inside the folder): `result_types.py`, `ledger_types.py`.
 13. The synthetic fixtures use only invented companies; IBANs are public example IBANs with valid checksums.
+14. Dashboard definitions: "open payables" = sum of positive invoice balances (= aging total); credits (overpaid invoices + unassigned payments) are reported separately, so open − credits = sum of supplier ledger balances = sum of all ledger entries.
+15. Dashboard default period is "this year"; KPIs "due in 7/14/30 days" have no previous-period value; the discrepancy KPI is the sum of absolute claimed-vs-ledger differences of notices in the period.
+16. Qt combo boxes return str-enums as plain strings; screens convert them back (`PaymentMethod(...)`, ...). UI tests patch modal dialogs and tear Qt down explicitly (`tests/conftest.py`).
+17. Domain texts produced by services (reconciliation messages) are German literals; every UI label lives in `i18n/de.json` (a test checks that all `tr()` keys exist).
+18. PIN recovery: `SupplierApp.exe --reset-pin` after typing a confirmation phrase; the PIN is a screen lock, the data is not encrypted.

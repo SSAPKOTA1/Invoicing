@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from supplier_app.models.entities import Party
-from supplier_app.models.enums import DunningLevel, PartyRole, ReferenceType, ReviewStatus
+from supplier_app.models.enums import DocumentType, DunningLevel, PartyRole, ReferenceType, ReviewStatus
 from supplier_app.services.dunning_service import NoticeDraft
 from supplier_app.services.ledger import NoticeClaim
 from supplier_app.util.dates import format_date
@@ -38,12 +38,17 @@ class DemoDataService:
         return bool(self.svc.repos.parties.list()) or self.svc.repos.ledger.count() > 0
 
     # -- helpers -----------------------------------------------------------------------
-    def _letter_doc(self, title: str, sender: str, day: date, lines: list[str], tmp: Path, name: str):
+    def _letter_doc(self, title: str, sender: str, day: date, lines: list[str], tmp: Path, name: str, level: int = 0):
         text = "\n".join([sender, "Beispiel Handels GmbH · Hauptstraße 12 · 10115 Berlin", title, f"Datum: {format_date(day)}",
                           *lines])
         path = tmp / f"{name}.txt"
         path.write_text(text, encoding="utf-8")
         doc, _created = self.svc.documents.store_file(path)
+        doc.ocr_text, doc.text_source, doc.confidence = text, "plain", 0.95
+        doc.doc_type = {1: DocumentType.PAYMENT_REMINDER, 2: DocumentType.FIRST_DUNNING, 3: DocumentType.SECOND_DUNNING,
+                        4: DocumentType.FINAL_DUNNING, 5: DocumentType.COLLECTION_LETTER,
+                        6: DocumentType.COURT_ORDER}.get(level, DocumentType.OTHER)
+        self.svc.repos.documents.update(doc)
         return doc
 
     def load(self, today: date | None = None) -> DemoSummary:
@@ -92,7 +97,7 @@ class DemoDataService:
             doc = self._letter_doc(
                 doc_title or "Mahnung", sender.name, ago(days_ago),
                 [f"Hauptforderung: {format_cents(principal)}", f"Gesamtforderung: {format_cents(total)}",
-                 *[f"{lbl}: {v}" for lbl, v in (refs or [])]], tmp, f"brief-{inv_id}-{days_ago}")
+                 *[f"{lbl}: {v}" for lbl, v in (refs or [])]], tmp, f"brief-{inv_id}-{days_ago}", int(level))
             doc.review_status = ReviewStatus.ACCEPTED
             svc.repos.documents.update(doc)
             svc.dunning.book_notice(NoticeDraft(

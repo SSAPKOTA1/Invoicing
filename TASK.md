@@ -30,18 +30,18 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 - [x] 3.5 Commit `Phase 3`
 
 ## Phase 4 – UI
-- [ ] 4.1 Themes, main window, navigation, global search
-- [ ] 4.2 Dashboard service + dashboard screen (filters, KPIs, charts, lists, drill-down)
-- [ ] 4.3 Suppliers, Cases/history view, Transactions, Documents + review workflow
-- [ ] 4.4 Payment dialog, Settings, PIN screen
-- [ ] 4.5 Demo data, offscreen smoke tests, screenshots script
-- [ ] 4.6 Commit `Phase 4`
+- [x] 4.1 Themes, main window, navigation, global search
+- [x] 4.2 Dashboard service + dashboard screen (filters, KPIs, charts, lists, drill-down)
+- [x] 4.3 Suppliers, Cases/history view, Transactions, Documents + review workflow
+- [x] 4.4 Payment dialog, Settings, PIN screen
+- [x] 4.5 Demo data, offscreen smoke tests, screenshots script
+- [x] 4.6 Commit `Phase 4`
 
 ## Phase 5 – Reporting
-- [ ] 5.1 Report builders + CSV/Excel/PDF export
-- [ ] 5.2 Dashboard export (PDF/PNG)
-- [ ] 5.3 Tests: exported numbers == DB
-- [ ] 5.4 Commit `Phase 5`
+- [x] 5.1 Report builders + CSV/Excel/PDF export
+- [x] 5.2 Dashboard export (PDF/PNG)
+- [x] 5.3 Tests: exported numbers == DB
+- [x] 5.4 Commit `Phase 5`
 
 ## Phase 6 – Packaging and CI
 - [ ] 6.1 Pinned requirements, fresh venv install test
@@ -59,3 +59,5 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 - 2026-10-09 Phase 1: schema m001-m003, repositories, 24 tests green, --selfcheck ok
 - 2026-10-09 Phase 2: ledger engine (ledger/ coverage ~99%), services, search, backup/restore, PIN; worked example = 615,00 EUR
 - 2026-10-09 Phase 3: OCR (text layer + Tesseract), rule-based ai/, ingest+review services; e2e scenario passes with PDF and scans
+- 2026-10-09 Phase 4: themes, dashboard (filters/KPIs/charts/lists/drill-down), all screens, search, review workflow, payment dialog, PIN, demo data, 13 offscreen UI tests, --selfcheck builds 14 screen/theme combos
+- 2026-10-09 Phase 5: report builders, CSV/Excel/PDF exporters, dashboard PNG/PDF export; tests prove exported numbers == ledger

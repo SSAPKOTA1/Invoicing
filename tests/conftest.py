@@ -46,3 +46,35 @@ def svc(storage: Storage) -> Services:
 @pytest.fixture()
 def file_svc(file_storage: Storage) -> Services:
     return build_services(file_storage)
+
+
+@pytest.fixture(autouse=True)
+def _no_modal_dialogs(monkeypatch):
+    """Modal dialogs would block a headless test run: make exec() return immediately."""
+    try:
+        from PySide6.QtWidgets import QDialog, QMessageBox
+    except ImportError:  # pragma: no cover
+        return
+    monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
+    monkeypatch.setattr(QDialog, "exec", lambda self: 0)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _qt_cleanup():
+    """Tear Qt down in a defined order so the interpreter does not crash at exit."""
+    yield
+    try:
+        import gc
+
+        from PySide6.QtCore import QEvent
+        from PySide6.QtWidgets import QApplication
+    except ImportError:  # pragma: no cover
+        return
+    app = QApplication.instance()
+    if app is not None:
+        for top in app.topLevelWidgets():
+            top.deleteLater()
+        app.closeAllWindows()
+        app.processEvents()
+        QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        gc.collect()
