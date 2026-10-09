@@ -1,0 +1,26 @@
+Inkasso Schmidt & Partner GmbH
+Postfach 10 20 30 · 50667 Köln
+Tel. 0221 998877 · service@inkasso-schmidt.example
+Inkasso Schmidt & Partner GmbH · Postfach 10 20 30 · 50667 Köln
+Beispiel Handels GmbH
+Hauptstraße 12
+10115 Berlin
+Inkassoschreiben
+Datum: 15.05.2024
+Aktenzeichen: INK-2024-90001
+Mandatsnummer: M-5521
+Gläubiger: Müller Bürobedarf GmbH
+Betreff: Forderungsaufstellung zur Rechnung RE-2024/001
+Wir vertreten die Interessen der Firma Müller Bürobedarf GmbH. Die Forderung wurde an uns
+zum Einzug übergeben. Es ergibt sich folgende Forderungsaufstellung:
+Hauptforderung:                  1.000,00 €
+Mahnkosten:                        15,00 €
+Verzugszinsen:                    27,40 €
+Verzugspauschale:                 40,00 €
+Inkassokosten:                   120,50 €
+Gesamtforderung:                1.202,90 €
+abzüglich Zahlung vom 01.04.2024:   400,00 €
+Noch zu zahlen:                  802,90 €
+Zahlen Sie bitte bis zum 29.05.2024.
+Bankverbindung: IBAN DE02 1203 0000 0000 2020 51 · BIC BYLADEM1001
+Inkasso Schmidt & Partner GmbH · Sitz Köln · USt-IdNr. DE987654321

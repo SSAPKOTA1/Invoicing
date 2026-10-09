@@ -1,0 +1,9 @@
+Acme Office Supplies Ltd.
+Payment reminder
+Date: 20.04.2024
+Reference: REM-77
+Our invoice INV-2024-17 dated 12.03.2024 is still unpaid.
+Outstanding amount: 1,190.00 EUR
+Reminder fee: 5.00 EUR
+Total: 1,195.00 EUR
+Please pay by 04.05.2024.

@@ -1,0 +1,17 @@
+Müller Bürobedarf GmbH
+Industrieweg 5 · 80331 München
+Tel. 089 1234567 · info@mueller-buero.example
+Müller Bürobedarf GmbH · Industrieweg 5 · 80331 München
+Beispiel Handels GmbH
+Hauptstraße 12
+10115 Berlin
+Gutschrift
+Gutschriftsnummer: GS-2024/003
+Datum: 05.02.2024
+Bezug: Rechnung RE-2024/001 vom 10.01.2024
+Nettobetrag: 84,03 €
+zzgl. 19 % MwSt.: 15,97 €
+Gutschriftsbetrag: 100,00 €
+Der Betrag wird mit Ihrer nächsten Rechnung verrechnet.
+USt-IdNr. DE123456789 · Bankverbindung: IBAN DE89 3704 0044 0532 0130 00 · BIC COBADEFFXXX
+Müller Bürobedarf GmbH · Geschäftsführer: Hans Müller · Amtsgericht München HRB 123456
