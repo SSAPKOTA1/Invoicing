@@ -110,7 +110,9 @@ class LedgerService(ServiceBase):
             self.lines(invoice_id=invoice_id), self.allocation_rows(invoice_id), self._manual_status(invoice), as_of
         )
 
-    def invoice_states(self, as_of: date | None = None, supplier_id: int | None = None) -> list[InvoiceState]:
+    def invoice_states(
+        self, as_of: date | None = None, supplier_id: int | None = None, invoices: list[Invoice] | None = None
+    ) -> list[InvoiceState]:
         """Balances of all invoices that have entries up to ``as_of`` (set-based, fast)."""
         sums: dict[int, dict[LedgerEntryType, int]] = defaultdict(dict)
         for invoice_id, _sid, ctype, total in self.repos.ledger.sums_by_invoice(as_of=as_of, supplier_id=supplier_id):
@@ -119,7 +121,7 @@ class LedgerService(ServiceBase):
         for invoice_id, comp, total in self.repos.payments.allocation_sums(as_of=as_of):
             alloc[invoice_id][AllocationComponent(comp)] = total
         states: list[InvoiceState] = []
-        for invoice in self.repos.invoices.list(supplier_id=supplier_id):
+        for invoice in invoices if invoices is not None else self.repos.invoices.list(supplier_id=supplier_id):
             assert invoice.id is not None
             if invoice.id not in sums:
                 continue

@@ -186,6 +186,29 @@ class SqliteLedgerRepository(SqliteRepo, LedgerRepository):
         sql += " GROUP BY supplier_id"
         return {r[0]: r[1] for r in self.db.query_all(sql, params)}
 
+    def balances_by_invoice(self, *, as_of: date | None = None, supplier_id: int | None = None) -> dict[int, int]:
+        sql = "SELECT invoice_id, SUM(amount_cents) FROM ledger_entries WHERE invoice_id IS NOT NULL"
+        params: list[object] = []
+        if as_of:
+            sql += " AND entry_date<=?"
+            params.append(d2s(as_of))
+        if supplier_id is not None:
+            sql += " AND supplier_id=?"
+            params.append(supplier_id)
+        return {r[0]: r[1] for r in self.db.query_all(sql + " GROUP BY invoice_id", params)}
+
+    def unapplied_entries(self, *, supplier_id: int | None = None, as_of: date | None = None) -> list[LedgerEntry]:
+        sql = (f"SELECT {_LEDGER_COLS} FROM ledger_entries e WHERE e.invoice_id IS NULL AND e.entry_type='PAYMENT'"
+               " AND e.payment_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ledger_entries r WHERE r.reverses_entry_id=e.id)")
+        params: list[object] = []
+        if supplier_id is not None:
+            sql += " AND e.supplier_id=?"
+            params.append(supplier_id)
+        if as_of:
+            sql += " AND e.entry_date<=?"
+            params.append(d2s(as_of))
+        return [_entry(r) for r in self.db.query_all(sql + " ORDER BY e.entry_date, e.id", params)]
+
     def sums_by_type(
         self, *, date_from: date | None = None, date_to: date | None = None, supplier_id: int | None = None,
         month_buckets: bool = False,

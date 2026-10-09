@@ -192,15 +192,12 @@ class PaymentService(ServiceBase):
 
     # -- unassigned credit -----------------------------------------------------
     def unapplied_payments(self, supplier_id: int | None = None) -> list[UnappliedPayment]:
-        entries = self.repos.ledger.list(supplier_id=supplier_id)
-        reversed_ids = {e.reverses_entry_id for e in entries if e.reverses_entry_id}
         out: list[UnappliedPayment] = []
-        for e in entries:
-            if (e.entry_type == LedgerEntryType.PAYMENT and e.invoice_id is None and e.payment_id is not None
-                    and e.id not in reversed_ids):
-                payment = self.repos.payments.get(e.payment_id)
-                assert payment is not None and e.id is not None
-                out.append(UnappliedPayment(payment, e.id, -e.amount_cents))
+        for e in self.repos.ledger.unapplied_entries(supplier_id=supplier_id):
+            assert e.payment_id is not None and e.id is not None
+            payment = self.repos.payments.get(e.payment_id)
+            assert payment is not None
+            out.append(UnappliedPayment(payment, e.id, -e.amount_cents))
         return out
 
     def apply_credit(

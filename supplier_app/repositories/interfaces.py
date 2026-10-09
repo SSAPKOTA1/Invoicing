@@ -94,6 +94,12 @@ class LedgerRepository(ABC):
     def unapplied_by_supplier(self, *, as_of: date | None = None) -> dict[int, int]:
         """Sum of entries without invoice per supplier (negative = credit on account)."""
     @abstractmethod
+    def balances_by_invoice(self, *, as_of: date | None = None, supplier_id: int | None = None) -> dict[int, int]:
+        """Sum of all entries per invoice (the open balance), one row per invoice."""
+    @abstractmethod
+    def unapplied_entries(self, *, supplier_id: int | None = None, as_of: date | None = None) -> list[LedgerEntry]:
+        """Not yet reversed PAYMENT entries without invoice (credit on account)."""
+    @abstractmethod
     def sums_by_type(
         self,
         *,
