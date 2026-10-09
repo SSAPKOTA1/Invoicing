@@ -35,3 +35,12 @@ CI target: GitHub Actions `windows-latest`, Python 3.11 (see the CI section at t
 * Base-rate table is a seeded default (ends 2025-07-01 at 1.27 %); users must verify rates (not legal advice).
 * Recognition is rule-based: unusual letter layouts need a manual correction in the review form.
 * PyMuPDF is AGPL-licensed (see `LICENSE-THIRD-PARTY.txt`); `pdfplumber` from the brief is not used.
+
+## CI (GitHub Actions, `windows-latest`, Python 3.11)
+
+Run on commit `dbcea07` ([run 37944562914](https://github.com/SSAPKOTA1/Invoicing/actions/runs/37944562914)): **PASS** – every step green:
+install Tesseract (`deu`, `eng`) → install requirements → lint → pytest with coverage (≥ 85 % total) → per-area coverage check →
+`--selfcheck` → screenshots (artifact `screenshots`) → `scripts/build_exe.ps1` → self-check of the built
+`SupplierAppConsole.exe` and `SupplierApp.exe` (exit code 0) → artifact `SupplierApp-windows-x64`.
+The status of the run on the final commit is recorded in the pull request. (Item 13 above: PASS for the run named here;
+`gh` was not authenticated in the authoring environment, so the run was read through the GitHub API tools.)

@@ -44,13 +44,13 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 - [x] 5.4 Commit `Phase 5`
 
 ## Phase 6 – Packaging and CI
-- [ ] 6.1 Pinned requirements, fresh venv install test
-- [ ] 6.2 `scripts/build_exe.ps1`, PyInstaller spec, Tesseract bundling
-- [ ] 6.3 CI + release workflows
-- [ ] 6.4 README (German end user + dev), VERIFICATION.md
-- [ ] 6.5 Full test run + coverage, TODO/stub search
-- [ ] 6.6 Push, watch CI, PR to main
-- [ ] 6.7 Commit `Phase 6`
+- [x] 6.1 Pinned requirements, fresh venv install test
+- [x] 6.2 `scripts/build_exe.ps1`, PyInstaller spec, Tesseract bundling
+- [x] 6.3 CI + release workflows
+- [x] 6.4 README (German end user + dev), VERIFICATION.md
+- [x] 6.5 Full test run + coverage, TODO/stub search
+- [x] 6.6 Push, watch CI, PR to main
+- [x] 6.7 Commit `Phase 6`
 
 ## Known issues
 (none yet)
@@ -61,3 +61,4 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 - 2026-10-09 Phase 3: OCR (text layer + Tesseract), rule-based ai/, ingest+review services; e2e scenario passes with PDF and scans
 - 2026-10-09 Phase 4: themes, dashboard (filters/KPIs/charts/lists/drill-down), all screens, search, review workflow, payment dialog, PIN, demo data, 13 offscreen UI tests, --selfcheck builds 14 screen/theme combos
 - 2026-10-09 Phase 5: report builders, CSV/Excel/PDF exporters, dashboard PNG/PDF export; tests prove exported numbers == ledger
+- 2026-10-09 Phase 6: pinned requirements (fresh venv ok), PyInstaller spec (built+selfcheck on Linux), build_exe.ps1, ci.yml/release.yml, README, VERIFICATION; CI run on dbcea07 green incl. exe build + exe selfcheck
