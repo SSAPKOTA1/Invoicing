@@ -8,3 +8,8 @@
 6. Interest: days counted for `due < d <= until`; a payment on day P reduces the principal from P+1. Interest rounded once (ROUND_HALF_UP). Seeded base rates are defaults to verify, not legal advice.
 7. Money is integer cents; VAT rate is stored as text decimal; interest rate as `Decimal`.
 8. Extra column `flat_fee_cents` on notices (Verzugspauschale) in addition to the fields in the brief.
+9. Recognition is review-first: every imported document gets status `pending` (or `needs_review` when confidence < 0.75 or errors exist); bookings only happen in `IngestService.confirm`.
+10. Collection letters that print a total before deducting payments ("Gesamtforderung" + "abzüglich Zahlung" + "Noch zu zahlen") are mapped to claim total = remaining amount and principal = principal − paid, so reconciliation compares like with like.
+11. Court costs are booked as `COLLECTION_COST` (no separate ledger type); `ReferenceType` labels are matched case-insensitively and tolerate one OCR-inserted space inside compound words.
+12. Modules named `types.py` were avoided (they shadow the stdlib when a script runs inside the folder): `result_types.py`, `ledger_types.py`.
+13. The synthetic fixtures use only invented companies; IBANs are public example IBANs with valid checksums.

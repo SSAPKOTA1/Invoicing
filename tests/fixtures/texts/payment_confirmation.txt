@@ -1,0 +1,13 @@
+Beispiel Handels GmbH
+Zahlungsbeleg Online-Banking
+Beispiel Handels GmbH · Zahlungsbeleg Online-Banking
+Beispiel Handels GmbH
+Hauptstraße 12
+10115 Berlin
+Zahlungsbestätigung
+Ausführungsdatum: 01.04.2024
+Empfänger: Müller Bürobedarf GmbH
+IBAN Empfänger: DE89 3704 0044 0532 0130 00
+Betrag: 400,00 EUR
+Verwendungszweck: RE-2024/001 Teilzahlung
+Die Überweisung wurde ausgeführt.

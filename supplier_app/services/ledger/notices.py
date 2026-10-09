@@ -10,7 +10,7 @@ from supplier_app.models.enums import LedgerEntryType as T
 from supplier_app.util.dates import format_date
 from supplier_app.util.money import format_cents
 
-from .types import LedgerLine
+from .ledger_types import LedgerLine
 
 
 @dataclass(frozen=True)

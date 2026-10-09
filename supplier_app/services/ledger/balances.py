@@ -8,7 +8,7 @@ from datetime import date
 from supplier_app.models.enums import AllocationComponent, InvoiceStatus
 from supplier_app.models.enums import LedgerEntryType as T
 
-from .types import AllocationRow, InvoiceBalance, LedgerLine, RunningRow
+from .ledger_types import AllocationRow, InvoiceBalance, LedgerLine, RunningRow
 
 
 def derive_status(balance_cents: int, paid_cents: int, manual: InvoiceStatus | None) -> InvoiceStatus:

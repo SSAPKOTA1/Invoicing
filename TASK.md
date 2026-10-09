@@ -23,11 +23,11 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 - [x] 2.6 Commit `Phase 2`
 
 ## Phase 3 – OCR and recognition
-- [ ] 3.1 Fixture generator (PDF + scanned PNG)
-- [ ] 3.2 `ocr/` (text layer, Tesseract wrapper, preprocessing)
-- [ ] 3.3 `ai/` classifier, field extractor, reference extractor, validator, link matcher
-- [ ] 3.4 Document ingest + review services; end-to-end scenario test
-- [ ] 3.5 Commit `Phase 3`
+- [x] 3.1 Fixture generator (PDF + scanned PNG)
+- [x] 3.2 `ocr/` (text layer, Tesseract wrapper, preprocessing)
+- [x] 3.3 `ai/` classifier, field extractor, reference extractor, validator, link matcher
+- [x] 3.4 Document ingest + review services; end-to-end scenario test
+- [x] 3.5 Commit `Phase 3`
 
 ## Phase 4 – UI
 - [ ] 4.1 Themes, main window, navigation, global search
@@ -58,3 +58,4 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 ## Log
 - 2026-10-09 Phase 1: schema m001-m003, repositories, 24 tests green, --selfcheck ok
 - 2026-10-09 Phase 2: ledger engine (ledger/ coverage ~99%), services, search, backup/restore, PIN; worked example = 615,00 EUR
+- 2026-10-09 Phase 3: OCR (text layer + Tesseract), rule-based ai/, ingest+review services; e2e scenario passes with PDF and scans

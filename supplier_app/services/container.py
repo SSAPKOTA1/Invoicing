@@ -11,6 +11,7 @@ from supplier_app.services.case_service import CaseService
 from supplier_app.services.document_service import DocumentService
 from supplier_app.services.dunning_service import DunningService
 from supplier_app.services.history_service import HistoryService
+from supplier_app.services.ingest_service import IngestService, make_text_extractor
 from supplier_app.services.invoice_service import InvoiceService
 from supplier_app.services.ledger_service import LedgerService
 from supplier_app.services.payment_service import PaymentService
@@ -35,6 +36,7 @@ class Services:
     search: SearchService
     documents: DocumentService
     backup: BackupService
+    ingest: IngestService
 
 
 def build_services(storage: Storage) -> Services:
@@ -43,18 +45,26 @@ def build_services(storage: Storage) -> Services:
     settings.ensure_defaults()
     ledger = LedgerService(repos, settings)
     cases = CaseService(repos)
+    suppliers = SupplierService(repos)
+    invoices = InvoiceService(repos, ledger, cases, settings)
+    payments = PaymentService(repos, ledger, cases, settings)
+    dunning = DunningService(repos, ledger, cases, settings)
+    documents = DocumentService(repos, storage.paths)
+    ingest = IngestService(repos, documents, make_text_extractor(settings), settings, ledger, suppliers, invoices,
+                           payments, dunning)
     return Services(
         repos=repos,
         settings=settings,
         pin=PinService(repos),
-        suppliers=SupplierService(repos),
+        suppliers=suppliers,
         ledger=ledger,
         cases=cases,
-        invoices=InvoiceService(repos, ledger, cases, settings),
-        payments=PaymentService(repos, ledger, cases, settings),
-        dunning=DunningService(repos, ledger, cases, settings),
+        invoices=invoices,
+        payments=payments,
+        dunning=dunning,
         history=HistoryService(repos, ledger),
         search=SearchService(repos),
-        documents=DocumentService(repos, storage.paths),
+        documents=documents,
         backup=BackupService(storage.db, storage.paths),
+        ingest=ingest,
     )
