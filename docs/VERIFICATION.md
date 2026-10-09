@@ -42,5 +42,7 @@ Run on commit `dbcea07` ([run 37944562914](https://github.com/SSAPKOTA1/Invoicin
 install Tesseract (`deu`, `eng`) → install requirements → lint → pytest with coverage (≥ 85 % total) → per-area coverage check →
 `--selfcheck` → screenshots (artifact `screenshots`) → `scripts/build_exe.ps1` → self-check of the built
 `SupplierAppConsole.exe` and `SupplierApp.exe` (exit code 0) → artifact `SupplierApp-windows-x64`.
-The status of the run on the final commit is recorded in the pull request. (Item 13 above: PASS for the run named here;
+The same pipeline is also green on the final code commit `f5e855d` ([run 37945324626](https://github.com/SSAPKOTA1/Invoicing/actions/runs/37945324626), tests, exe build, exe self-check, screenshots and zip artifacts all succeeded). (Item 13 above: PASS for the run named here;
 `gh` was not authenticated in the authoring environment, so the run was read through the GitHub API tools.)
+
+No pull request was opened: the repository has no `main` branch yet (only `claude/zen-cannon-x8l4cj`), and pushing to another branch was not permitted.
