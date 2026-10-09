@@ -15,12 +15,12 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 - [x] 1.7 Commit `Phase 1`
 
 ## Phase 2 – Ledger engine and backend services
-- [ ] 2.1 Ledger engine tests first (worked example etc.)
-- [ ] 2.2 Ledger engine (balances, allocation, notice postings, reconciliation, interest, aging)
-- [ ] 2.3 Services: supplier, invoice, payment, dunning, case, ledger, audit
-- [ ] 2.4 Search service
-- [ ] 2.5 Backup / restore, PIN, settings
-- [ ] 2.6 Commit `Phase 2`
+- [x] 2.1 Ledger engine tests first (worked example etc.)
+- [x] 2.2 Ledger engine (balances, allocation, notice postings, reconciliation, interest, aging)
+- [x] 2.3 Services: supplier, invoice, payment, dunning, case, ledger, audit
+- [x] 2.4 Search service
+- [x] 2.5 Backup / restore, PIN, settings
+- [x] 2.6 Commit `Phase 2`
 
 ## Phase 3 – OCR and recognition
 - [ ] 3.1 Fixture generator (PDF + scanned PNG)
@@ -57,3 +57,4 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 
 ## Log
 - 2026-10-09 Phase 1: schema m001-m003, repositories, 24 tests green, --selfcheck ok
+- 2026-10-09 Phase 2: ledger engine (ledger/ coverage ~99%), services, search, backup/restore, PIN; worked example = 615,00 EUR

@@ -33,3 +33,16 @@ def file_storage(tmp_path: Path) -> Iterator[Storage]:
     st = open_storage(AppPaths(tmp_path / "data"))
     yield st
     st.close()
+
+
+from supplier_app.services.container import Services, build_services  # noqa: E402
+
+
+@pytest.fixture()
+def svc(storage: Storage) -> Services:
+    return build_services(storage)
+
+
+@pytest.fixture()
+def file_svc(file_storage: Storage) -> Services:
+    return build_services(file_storage)
