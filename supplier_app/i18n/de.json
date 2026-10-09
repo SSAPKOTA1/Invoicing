@@ -370,7 +370,7 @@
  "settings.pay_days": "Standard-Zahlungsziel (Tage)",
  "settings.pin.off": "Die PIN-Sperre ist ausgeschaltet.",
  "settings.pin.on": "Die PIN-Sperre ist eingeschaltet.",
- "settings.pin.recovery": "PIN vergessen? Schließen Sie die Anwendung und starten Sie sie über die Eingabeaufforderung mit „SupplierApp.exe --reset-pin“ (siehe README).",
+ "settings.pin.recovery": "PIN vergessen? Schließen Sie die Anwendung und starten Sie sie über die Eingabeaufforderung mit „SupplierAppConsole.exe --reset-pin“ (siehe README).",
  "settings.rate.add": "Hinzufügen / ändern",
  "settings.rate.base": "Basiszinssatz (%)",
  "settings.rate.delete": "Markierten löschen",

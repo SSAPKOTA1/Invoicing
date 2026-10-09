@@ -1,4 +1,4 @@
-"""Translation lookup. All user-visible UI strings live in ``de.json`` (en.json is a stub)."""
+"""Translation lookup. All user-visible UI strings live in ``de.json`` (en.json holds the English start of a second language)."""
 
 from __future__ import annotations
 
