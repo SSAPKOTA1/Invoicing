@@ -6,13 +6,13 @@ Resume rule: read this file + `docs/DECISIONS.md`, continue at the first uncheck
 Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for `build/initial`).
 
 ## Phase 1 – Architecture, database, migrations
-- [ ] 1.1 Skeleton, packaging files, `--selfcheck` entry point
-- [ ] 1.2 Models (enums + dataclasses)
-- [ ] 1.3 Database layer (connection, transactions, savepoints)
-- [ ] 1.4 Migrations runner (backup, rollback) + schema 001..003 incl. FTS5
-- [ ] 1.5 Repository interfaces + SQLite implementations
-- [ ] 1.6 Tests (migrations, repositories) green; app creates its DB
-- [ ] 1.7 Commit `Phase 1`
+- [x] 1.1 Skeleton, packaging files, `--selfcheck` entry point
+- [x] 1.2 Models (enums + dataclasses)
+- [x] 1.3 Database layer (connection, transactions, savepoints)
+- [x] 1.4 Migrations runner (backup, rollback) + schema 001..003 incl. FTS5
+- [x] 1.5 Repository interfaces + SQLite implementations
+- [x] 1.6 Tests (migrations, repositories) green; app creates its DB
+- [x] 1.7 Commit `Phase 1`
 
 ## Phase 2 – Ledger engine and backend services
 - [ ] 2.1 Ledger engine tests first (worked example etc.)
@@ -56,3 +56,4 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 (none yet)
 
 ## Log
+- 2026-10-09 Phase 1: schema m001-m003, repositories, 24 tests green, --selfcheck ok
