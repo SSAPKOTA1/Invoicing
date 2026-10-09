@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -43,9 +47,10 @@ jobs:
         run: ruff check supplier_app tests scripts
 
       - name: Tests with coverage thresholds
+        timeout-minutes: 25
         run: >
-          python -m pytest tests --cov=supplier_app --cov-report=term-missing --cov-report=xml
-          --cov-fail-under=85
+          python -m pytest tests -v --durations=15 -o faulthandler_timeout=300 --cov=supplier_app
+          --cov-report=term-missing --cov-report=xml --cov-fail-under=85
 
       - name: Coverage per area (ledger >= 90 %, repositories/migrations/services/ai >= 80 %)
         run: python scripts/check_coverage.py coverage.xml
