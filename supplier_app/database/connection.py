@@ -24,8 +24,12 @@ class Database:
     * :meth:`transaction` nests via savepoints
     """
 
+    backend = "sqlite"
+
     def __init__(self, path: Path | str, *, timeout: float = 5.0) -> None:
         self.path = str(path)
+        self.read_only = False
+        self.user_name = ""  # who is logged in (multi-user mode); written to the audit log
         self._timeout = timeout
         self._conn: sqlite3.Connection | None = None
         self._depth = 0
@@ -74,6 +78,8 @@ class Database:
 
     # -- statements --------------------------------------------------------
     def execute(self, sql: str, params: Params = ()) -> sqlite3.Cursor:
+        if self.read_only and "app_users" not in sql and not sql.lstrip().upper().startswith(("SELECT", "WITH", "PRAGMA", "BEGIN", "COMMIT", "ROLLBACK")):
+            raise DatabaseError("Ihre Benutzerrolle erlaubt nur Lesen. Änderungen sind nicht möglich.")
         try:
             return self.conn.execute(sql, params)
         except sqlite3.IntegrityError:
@@ -166,3 +172,7 @@ class Database:
 
     def integrity_ok(self) -> bool:
         return self.scalar("PRAGMA integrity_check") == "ok"
+
+    def data_version(self) -> int:
+        """Changes when another connection modified the file (live refresh of several windows)."""
+        return int(self.scalar("PRAGMA data_version", default=0))

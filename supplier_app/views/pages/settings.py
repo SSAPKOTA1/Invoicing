@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QUrl
+from PySide6.QtCore import QDate, Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QComboBox,
@@ -28,6 +28,8 @@ from supplier_app.errors import SupplierAppError
 from supplier_app.i18n import tr
 from supplier_app.models.enums import AllocationRule, ReferenceType
 from supplier_app.util.dates import format_date
+from supplier_app.views.dialogs.connection_dialog import ConnectionDialog
+from supplier_app.views.dialogs.login_dialog import PasswordDialog, UserDialog
 from supplier_app.views.dialogs.pin_dialog import ChangePinDialog
 from supplier_app.views.errors import confirm, info, show_error
 from supplier_app.views.pages.base import Page
@@ -49,7 +51,7 @@ class SettingsPage(Page):
         root.setContentsMargins(24, 20, 24, 24)
         root.setSpacing(14)
         root.addWidget(page_title(tr("nav.settings")))
-        for builder in (self._appearance, self._organization, self._security, self._paths, self._tesseract, self._interest, self._allocation,
+        for builder in (self._appearance, self._organization, self._database, self._account, self._users, self._security, self._paths, self._tesseract, self._interest, self._allocation,
                         self._references, self._vocabulary, self._backup, self._demo):
             root.addWidget(builder())
         root.addStretch(1)
@@ -79,8 +81,51 @@ class SettingsPage(Page):
         card.layout_.addLayout(row)
         return card
 
+    # -- multi-user mode ----------------------------------------------------------------------------------------
+    def _database(self) -> Card:
+        card = Card(tr("settings.database"))
+        self.db_info = QLabel()
+        self.db_info.setWordWrap(True)
+        self.db_info.setTextFormat(Qt.TextFormat.RichText)
+        card.add(self.db_info)
+        row = QHBoxLayout()
+        self.btn_conn = button(tr("settings.database.change"), "", self.change_connection)
+        self.btn_transfer = button(tr("settings.database.transfer"), "", self.transfer_to_server)
+        row.addWidget(self.btn_conn)
+        row.addWidget(self.btn_transfer)
+        row.addStretch(1)
+        card.layout_.addLayout(row)
+        card.add(muted(tr("settings.database.hint")))
+        self.database_card = card
+        return card
+
+    def _account(self) -> Card:
+        card = Card(tr("settings.account"))
+        self.account_info = QLabel()
+        card.add(self.account_info)
+        card.add(button(tr("user.password.change"), "", self.change_own_password))
+        self.account_card = card
+        return card
+
+    def _users(self) -> Card:
+        card = Card(tr("settings.users"))
+        card.add(muted(tr("settings.users.hint")))
+        self.user_table = DataTable(sortable=False)
+        self.user_table.setMaximumHeight(230)
+        card.add(self.user_table)
+        row = QHBoxLayout()
+        row.addWidget(button(tr("user.new"), "primary", self.new_user))
+        row.addWidget(button(tr("user.edit"), "", self.edit_user))
+        row.addWidget(button(tr("user.password.reset"), "", self.reset_user_password))
+        row.addWidget(button(tr("common.delete"), "danger", self.delete_user))
+        row.addStretch(1)
+        card.layout_.addLayout(row)
+        self.users_card = card
+        return card
+
     def _security(self) -> Card:
         card = Card(tr("settings.security"))
+        self.security_card = card
         self.pin_state = QLabel()
         card.add(self.pin_state)
         row = QHBoxLayout()
@@ -212,6 +257,7 @@ class SettingsPage(Page):
 
     def _demo(self) -> Card:
         card = Card(tr("settings.demo"))
+        self.demo_card = card
         card.add(muted(tr("settings.demo.hint")))
         card.add(button(tr("action.demo"), "", self.load_demo))
         self.about = QLabel(tr("settings.about"))
@@ -221,7 +267,88 @@ class SettingsPage(Page):
         return card
 
     # -- state -----------------------------------------------------------------------------------------------------
+    def _refresh_multi_user(self) -> None:
+        multi = self.ctrl.multi_user
+        session = self.svc.session
+        admin = session.is_admin
+        self.security_card.setVisible(not multi)  # the PIN lock is replaced by the user passwords
+        self.account_card.setVisible(multi)
+        self.users_card.setVisible(multi and admin)
+        cfg = self.ctrl.ctx.config
+        if multi:
+            self.db_info.setText(tr("settings.database.server", server=cfg.server_label))
+            self.account_info.setText(tr("settings.account.info", name=session.label, role=tr(f"role.user.{session.role.value}")))
+        else:
+            self.db_info.setText(tr("settings.database.local", path=str(self.ctrl.ctx.paths.root)))
+        self.btn_conn.setEnabled(admin and not cfg.dsn_override)
+        self.demo_card.setVisible(not multi)  # never fill a shared company database with sample data
+        self.btn_transfer.setVisible(not multi)
+        self.btn_transfer.setEnabled(admin)
+        if multi and admin:
+            rows = [Row([u.username, u.display_name, tr(f"role.user.{u.role.value}"),
+                         tr("user.active") if u.active else tr("user.locked"), u.last_login.replace("T", " ")], u.id)
+                    for u in self.svc.users.users()]
+            self.user_table.set_data([tr("login.username"), tr("user.display_name"), tr("user.role"), tr("user.status"),
+                                      tr("user.last_login")], rows, [150, 200, 140, 90, 160])
+
+    def _selected_user(self):  # type: ignore[no-untyped-def]
+        uid = self.user_table.selected_payload()
+        return self.svc.users.get(uid) if uid else None
+
+    def new_user(self) -> None:
+        if UserDialog(self.svc.users, parent=self).exec():
+            self._refresh_multi_user()
+
+    def edit_user(self) -> None:
+        user = self._selected_user()
+        if user is not None and UserDialog(self.svc.users, user, self).exec():
+            self._refresh_multi_user()
+            self.ctrl.notify_changed()
+
+    def reset_user_password(self) -> None:
+        user = self._selected_user()
+        if user is not None and user.id is not None and PasswordDialog(self.svc.users, user.id, own=False, parent=self).exec():
+            self.ctrl.status.emit(tr("user.password.done"))
+
+    def delete_user(self) -> None:
+        user = self._selected_user()
+        if user is None or not confirm(self, tr("user.delete.confirm", name=user.username)):
+            return
+        if self.ctrl.run(self.svc.users.delete_user, user.id, parent=self, notify=False):
+            self._refresh_multi_user()
+
+    def change_own_password(self) -> None:
+        user = self.svc.session.user
+        if user is not None and user.id is not None:
+            PasswordDialog(self.svc.users, user.id, own=True, parent=self).exec()
+
+    def change_connection(self) -> None:
+        dlg = ConnectionDialog(self.ctrl.ctx.config, self)
+        if dlg.exec() and dlg.result_config is not None:
+            dlg.result_config.save(self.ctrl.ctx.paths.root, keep_password=dlg.keep_password)
+            info(self, tr("settings.database.restart"))
+            self.ctrl.app.quit()
+
+    def transfer_to_server(self) -> None:
+        """Local data -> empty server database; afterwards the application starts in the multi-user mode."""
+        from supplier_app.backup.transfer import transfer_to_server
+        from supplier_app.settings.connection import MODE_SERVER, ConnectionConfig
+
+        cfg = ConnectionConfig(mode=MODE_SERVER)
+        dlg = ConnectionDialog(cfg, self)
+        if not dlg.exec() or dlg.result_config is None or not dlg.result_config.is_server:
+            return
+        target = dlg.result_config
+        if not confirm(self, tr("settings.database.transfer.confirm", server=target.server_label)):
+            return
+        rows = self.ctrl.run(transfer_to_server, self.ctrl.ctx.storage, target, parent=self, notify=False)
+        if rows:
+            target.save(self.ctrl.ctx.paths.root, keep_password=dlg.keep_password)
+            info(self, tr("settings.database.transfer.done", n=rows))
+            self.ctrl.app.quit()
+
     def refresh(self) -> None:
+        self._refresh_multi_user()
         s = self.svc.settings
         self.theme.setCurrentIndex(self.theme.findData(s.theme))
         enabled = self.svc.pin.enabled

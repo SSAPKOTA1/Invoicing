@@ -231,3 +231,12 @@ CREATE TABLE audit_log (
 );
 CREATE INDEX ix_audit_created ON audit_log(created_at);
 """
+
+PG_EXTRA = [
+    """CREATE FUNCTION trg_ledger_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    RAISE EXCEPTION 'ledger entries are immutable (append-only); use a reversal' USING ERRCODE = '23000';
+END $$""",
+    "CREATE TRIGGER trg_ledger_no_update BEFORE UPDATE ON ledger_entries FOR EACH ROW EXECUTE FUNCTION trg_ledger_immutable()",
+    "CREATE TRIGGER trg_ledger_no_delete BEFORE DELETE ON ledger_entries FOR EACH ROW EXECUTE FUNCTION trg_ledger_immutable()",
+]

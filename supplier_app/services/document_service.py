@@ -7,7 +7,7 @@ import re
 import shutil
 from pathlib import Path
 
-from supplier_app.errors import DocumentError
+from supplier_app.errors import DocumentError, DuplicateError
 from supplier_app.models.entities import Document
 from supplier_app.models.enums import ReviewStatus
 from supplier_app.repositories.interfaces import Repositories
@@ -32,9 +32,11 @@ def safe_name(name: str) -> str:
 
 
 class DocumentService(ServiceBase):
-    def __init__(self, repos: Repositories, paths: AppPaths) -> None:
+    def __init__(self, repos: Repositories, paths: AppPaths, *, files_in_database: bool = False) -> None:
         super().__init__(repos)
         self.paths = paths
+        #: multi-user mode: the files live in the database, the documents folder is only a local cache
+        self.files_in_database = files_in_database
 
     def store_file(self, source: Path) -> tuple[Document, bool]:
         """Copy ``source`` into the documents folder. Returns ``(document, created)``.
@@ -70,14 +72,30 @@ class DocumentService(ServiceBase):
         try:
             with self.repos.transaction():
                 self.repos.documents.add(doc)
+                assert doc.id is not None
+                if self.files_in_database:
+                    self.repos.documents.save_file(doc.id, target.read_bytes())
                 self._audit("import", "document", doc.id, source.name)
+        except DuplicateError:
+            target.unlink(missing_ok=True)
+            existing = self.repos.documents.get_by_hash(digest)  # another user imported the same file a moment ago
+            if existing is not None:
+                return existing, False
+            raise
         except Exception:
             target.unlink(missing_ok=True)
             raise
         return doc, True
 
     def file_path(self, doc: Document) -> Path:
-        return self.paths.documents / doc.stored_path
+        """Local path of the document file; in multi-user mode it is fetched from the database when not cached yet."""
+        path = self.paths.documents / doc.stored_path
+        if self.files_in_database and not path.exists() and doc.id is not None:
+            content = self.repos.documents.load_file(doc.id)
+            if content is not None:
+                self.paths.documents.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+        return path
 
     def get(self, doc_id: int) -> Document:
         doc = self.repos.documents.get(doc_id)

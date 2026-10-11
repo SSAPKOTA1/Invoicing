@@ -39,6 +39,7 @@ class AppController(QObject):
     supplier_requested = Signal()
     lock_requested = Signal()
     status = Signal(str)
+    user_changed = Signal()  # login / logout / user switch (multi-user mode)
 
     def __init__(self, ctx: AppContext, app: QApplication) -> None:
         super().__init__()
@@ -49,10 +50,52 @@ class AppController(QObject):
         self._idle.setSingleShot(True)
         self._idle.timeout.connect(self._idle_timeout)
         app.installEventFilter(self)
+        self._last_version: int | None = None
+        self._poll = QTimer(self)
+        self._poll.timeout.connect(self.poll_changes)
+
+    @property
+    def multi_user(self) -> bool:
+        return self.ctx.multi_user
+
+    @property
+    def lock_available(self) -> bool:
+        """Lock screen: PIN in single-user mode, the own password in the multi-user mode."""
+        return self.multi_user or self.ctx.services.pin.enabled
+
+    def start_polling(self, interval_ms: int = 3000) -> None:
+        """Multi-user mode: look every few seconds whether a colleague changed data and refresh then."""
+        if self.multi_user:
+            self._last_version = self._read_version()
+            self._poll.start(interval_ms)
+
+    def _read_version(self) -> int | None:
+        try:
+            return self.ctx.storage.db.data_version()
+        except Exception:  # noqa: BLE001 - a lost connection is reported by the next real operation
+            log.debug("change counter not readable", exc_info=True)
+            return None
+
+    def poll_changes(self) -> bool:
+        """Refresh all screens when someone else changed the data. Returns True when a refresh happened."""
+        version = self._read_version()
+        if version is None or version == self._last_version:
+            return False
+        self._last_version = version
+        who = ""
+        try:
+            who = str(self.ctx.storage.db.data_changed_by())
+        except Exception:  # noqa: BLE001
+            who = ""
+        if who and who != self.ctx.services.session.username:
+            self.status.emit(f"Daten wurden von {who} aktualisiert.")
+        self.data_changed.emit()
+        return True
 
     def shutdown(self) -> None:
         """Detach from the application (tests and clean exit)."""
         self._idle.stop()
+        self._poll.stop()
         self.app.removeEventFilter(self)
 
     # -- theme -----------------------------------------------------------------------------
@@ -94,6 +137,8 @@ class AppController(QObject):
     # -- data -----------------------------------------------------------------------------------
     def notify_changed(self) -> None:
         """Call after any booking: all visible numbers are re-read from the ledger."""
+        if self.multi_user:
+            self._last_version = self._read_version()  # our own change is not a reason for a second refresh
         self.data_changed.emit()
 
     def run(self, action: Callable[..., Any], *args: Any, parent: Any = None, success: str = "", notify: bool = True) -> Any:
@@ -113,7 +158,7 @@ class AppController(QObject):
     # -- idle lock -----------------------------------------------------------------------------------
     def restart_idle_timer(self) -> None:
         minutes = self.ctx.services.settings.get_int("idle_lock_minutes")
-        if self.ctx.services.pin.enabled and minutes > 0:
+        if self.lock_available and minutes > 0:
             self._idle.start(minutes * 60_000)
         else:
             self._idle.stop()
@@ -124,5 +169,5 @@ class AppController(QObject):
         return False
 
     def _idle_timeout(self) -> None:
-        if self.ctx.services.pin.enabled:
+        if self.lock_available:
             self.lock_requested.emit()

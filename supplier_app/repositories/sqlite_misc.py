@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import sqlite3
 from datetime import date
 from decimal import Decimal
 
+from supplier_app.database.errors import INTEGRITY_ERRORS
 from supplier_app.errors import DuplicateError
 from supplier_app.models.entities import AuditLogEntry, Category, InterestRate
 from supplier_app.repositories.interfaces import (
@@ -60,7 +60,7 @@ class SqliteCategoryRepository(SqliteRepo, CategoryRepository):
     def add(self, name: str) -> Category:
         try:
             return Category(id=self.db.insert("INSERT INTO categories(name) VALUES (?)", (name.strip(),)), name=name.strip())
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError(f"Kategorie '{name}' existiert bereits oder ist leer.") from exc
 
     def delete(self, category_id: int) -> None:
@@ -71,8 +71,9 @@ class SqliteAuditRepository(SqliteRepo, AuditRepository):
     def add(self, entry: AuditLogEntry) -> AuditLogEntry:
         entry.created_at = stamp(entry.created_at)
         entry.id = self.db.insert(
-            "INSERT INTO audit_log(created_at, action, entity, entity_id, details) VALUES (?,?,?,?,?)",
-            (entry.created_at, entry.action, entry.entity, entry.entity_id, entry.details),
+            "INSERT INTO audit_log(created_at, action, entity, entity_id, details, username) VALUES (?,?,?,?,?,?)",
+            (entry.created_at, entry.action, entry.entity, entry.entity_id, entry.details,
+             entry.username or getattr(self.db, "user_name", "")),
         )
         return entry
 
@@ -85,6 +86,6 @@ class SqliteAuditRepository(SqliteRepo, AuditRepository):
         params.append(limit)
         return [
             AuditLogEntry(id=r["id"], created_at=r["created_at"], action=r["action"], entity=r["entity"],
-                          entity_id=r["entity_id"], details=r["details"])
+                          entity_id=r["entity_id"], details=r["details"], username=r["username"])
             for r in self.db.query_all(sql, params)
         ]

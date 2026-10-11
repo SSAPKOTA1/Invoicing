@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from supplier_app.database.connection import Database
-from supplier_app.database.migrator import migrate
+from supplier_app.database.migrator import migrate, migrate_postgres
+from supplier_app.database.pg import PgDatabase
 from supplier_app.repositories.sqlite_repos import SqliteRepositories
 from supplier_app.settings.paths import AppPaths
 
@@ -13,7 +14,7 @@ from supplier_app.settings.paths import AppPaths
 @dataclass
 class Storage:
     paths: AppPaths
-    db: Database
+    db: Database | PgDatabase
     repos: SqliteRepositories
 
     def close(self) -> None:
@@ -26,6 +27,18 @@ def open_storage(paths: AppPaths) -> Storage:
     migrate(paths.database, backup_dir=paths.backups / "migrations")
     db = Database(paths.database).connect()
     return Storage(paths=paths, db=db, repos=SqliteRepositories(db))
+
+
+def open_pg_storage(paths: AppPaths, dsn: str) -> Storage:
+    """Connect to the PostgreSQL server (multi-user mode) and bring the schema up to date."""
+    paths.ensure()
+    db = PgDatabase(dsn).connect()
+    try:
+        migrate_postgres(db)
+    except Exception:
+        db.close()
+        raise
+    return Storage(paths=paths, db=db, repos=SqliteRepositories(db))  # type: ignore[arg-type]
 
 
 def open_memory_storage() -> Storage:

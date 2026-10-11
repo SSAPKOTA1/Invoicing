@@ -8,7 +8,7 @@ from supplier_app.errors import NotFoundError, ValidationError
 from supplier_app.models.entities import Company, Hotel
 from supplier_app.models.scope import ALL, Scope
 from supplier_app.repositories.interfaces import Repositories
-from supplier_app.services.base import ServiceBase
+from supplier_app.services.base import ServiceBase, atomic
 from supplier_app.util.normalize import normalize_name
 
 
@@ -26,6 +26,7 @@ class OrganizationService(ServiceBase):
         super().__init__(repos)
 
     # -- companies ------------------------------------------------------------------------
+    @atomic
     def create_company(self, name: str, notes: str = "") -> Company:
         if not name.strip():
             raise ValidationError("Bitte einen Namen für die Gesellschaft angeben.")
@@ -43,6 +44,7 @@ class OrganizationService(ServiceBase):
         self._audit("update", "company", company_id, company.name)
         return company
 
+    @atomic
     def delete_company(self, company_id: int) -> None:
         self.repos.organization.delete_company(company_id)
         self._audit("delete", "company", company_id)
@@ -57,6 +59,7 @@ class OrganizationService(ServiceBase):
         return self.repos.organization.companies()
 
     # -- hotels ------------------------------------------------------------------------------
+    @atomic
     def create_hotel(self, company_id: int, name: str, notes: str = "") -> Hotel:
         self.company(company_id)
         if not name.strip():
@@ -75,6 +78,7 @@ class OrganizationService(ServiceBase):
         self._audit("update", "hotel", hotel_id, hotel.name)
         return hotel
 
+    @atomic
     def delete_hotel(self, hotel_id: int) -> None:
         self.repos.organization.delete_hotel(hotel_id)
         self._audit("delete", "hotel", hotel_id)

@@ -11,7 +11,7 @@ from supplier_app.models.entities import Invoice, LedgerEntry
 from supplier_app.models.enums import AllocationComponent, InvoiceStatus, LedgerEntryType
 from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import Repositories
-from supplier_app.services.base import ServiceBase, today
+from supplier_app.services.base import ServiceBase, atomic, today
 from supplier_app.services.ledger import (
     AllocationRow,
     InterestResult,
@@ -216,6 +216,7 @@ class LedgerService(ServiceBase):
             amount_cents=amount_cents, invoice_id=invoice_id, document_id=document_id, notice_id=notice_id,
             payment_id=payment_id, comment=comment))
 
+    @atomic
     def reverse_entry(
         self, entry_id: int, reason: str = "", entry_date: date | None = None, *, allow_payment: bool = False
     ) -> LedgerEntry:

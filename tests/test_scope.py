@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import sqlite3
 from datetime import date
 
 import pytest
 
+from supplier_app.database.errors import INTEGRITY_ERRORS
 from supplier_app.errors import DuplicateError, NotFoundError, ValidationError
 from supplier_app.models.entities import Document, Party
 from supplier_app.models.enums import DunningLevel, ReviewStatus
@@ -60,7 +60,7 @@ def test_hotel_implies_company_and_company_only_is_allowed(world) -> None:
 
 def test_database_rejects_hotel_of_other_company(world) -> None:
     svc, w = world
-    with pytest.raises(sqlite3.DatabaseError):
+    with pytest.raises(INTEGRITY_ERRORS):
         svc.repos.db.execute("UPDATE invoices SET company_id=?, hotel_id=? WHERE id=?",
                              (w["b"].id, w["a1"].id, w["i_a1"].id))
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import date
 
+from supplier_app.database.errors import INTEGRITY_ERRORS
 from supplier_app.errors import DuplicateError
 from supplier_app.models.entities import DunningNotice, NoticeInvoiceClaim, Payment, PaymentAllocation
 from supplier_app.models.enums import AllocationComponent, DunningLevel, PaymentMethod
@@ -63,7 +64,7 @@ class SqliteNoticeRepository(SqliteRepo, NoticeRepository):
                     (notice.id, claim.invoice_id, claim.principal_cents, claim.fees_cents, claim.interest_cents,
                      claim.flat_fee_cents, claim.other_costs_cents, claim.total_cents),
                 )
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError("Dieses Schreiben wurde bereits erfasst.") from exc
         return notice
 

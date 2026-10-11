@@ -2,11 +2,28 @@
 
 from __future__ import annotations
 
+import functools
 import logging
+from collections.abc import Callable
 from datetime import date
+from typing import Any, TypeVar
 
 from supplier_app.models.entities import AuditLogEntry
 from supplier_app.repositories.interfaces import Repositories
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def atomic(func: F) -> F:
+    """Run a service operation as one unit: the global write lock is taken *before* anything is read, so that
+    balances, allocations and duplicate checks cannot be overtaken by another user working at the same moment."""
+
+    @functools.wraps(func)
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+        with self.repos.transaction():
+            return func(self, *args, **kwargs)
+
+    return wrapper  # type: ignore[return-value]
 
 
 class ServiceBase:

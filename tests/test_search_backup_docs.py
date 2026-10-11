@@ -7,6 +7,7 @@ from datetime import date
 import pytest
 
 from supplier_app.backup.service import BackupService
+from supplier_app.database.migrations import LATEST_VERSION
 from supplier_app.errors import BackupError, DocumentError
 from supplier_app.models.entities import Document
 from supplier_app.models.enums import DunningLevel, ReferenceType, ReviewStatus
@@ -65,7 +66,7 @@ def test_backup_restore_roundtrip(file_svc, file_storage) -> None:
     assert created and svc.documents.file_path(doc).exists()
     zip_path = svc.backup.create_backup()
     manifest = BackupService.verify_backup(zip_path)
-    assert manifest["schema_version"] == 4 and doc.stored_path in manifest["documents"]
+    assert manifest["schema_version"] == LATEST_VERSION and doc.stored_path in manifest["documents"]
     # change state after the backup
     svc.payments.record_payment(sc.supplier.id, date(2024, 4, 1), 5000, [sc.invoice.id])
     svc.documents.file_path(doc).unlink()
@@ -123,7 +124,7 @@ def test_restore_of_older_schema_gets_migrated(file_svc, file_storage, tmp_path)
         z.writestr("manifest.json", json.dumps({
             "schema_version": 1, "db_sha256": hashlib.sha256(old_db.read_bytes()).hexdigest(), "documents": {}}))
     file_svc.backup.restore_backup(zp)
-    assert file_storage.db.schema_version() == 4
+    assert file_storage.db.schema_version() == LATEST_VERSION
 
 
 def test_document_store_rules(file_svc, tmp_path) -> None:

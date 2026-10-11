@@ -82,7 +82,8 @@ class DashboardPage(Page):
         self.empty_card.add(muted(tr("dash.empty.text")))
         row = QHBoxLayout()
         row.addWidget(button(tr("action.import"), "primary", self.ctrl.import_requested.emit))
-        row.addWidget(button(tr("action.demo"), "", self._load_demo))
+        if not self.ctrl.multi_user:
+            row.addWidget(button(tr("action.demo"), "", self._load_demo))
         row.addStretch(1)
         self.empty_card.layout_.addLayout(row)
         root.addWidget(self.empty_card)

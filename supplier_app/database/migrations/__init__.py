@@ -1,10 +1,10 @@
-"""Numbered schema migrations."""
+"""Numbered schema migrations (written in SQLite dialect; PostgreSQL gets a translation plus ``PG_EXTRA``)."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from . import m001_core, m002_references_search, m003_reporting_indexes, m004_companies_hotels
+from . import m001_core, m002_references_search, m003_reporting_indexes, m004_companies_hotels, m005_users_sync
 
 
 @dataclass(frozen=True)
@@ -12,9 +12,11 @@ class Migration:
     version: int
     name: str
     sql: str
+    pg_extra: tuple[str, ...] = ()
 
 
 ALL_MIGRATIONS: list[Migration] = [
-    Migration(m.VERSION, m.NAME, m.SQL) for m in (m001_core, m002_references_search, m003_reporting_indexes, m004_companies_hotels)
+    Migration(m.VERSION, m.NAME, m.SQL, tuple(getattr(m, "PG_EXTRA", ())))
+    for m in (m001_core, m002_references_search, m003_reporting_indexes, m004_companies_hotels, m005_users_sync)
 ]
 LATEST_VERSION: int = ALL_MIGRATIONS[-1].version

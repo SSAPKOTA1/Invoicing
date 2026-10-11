@@ -29,6 +29,14 @@ def run_selfcheck(verbose: bool = True) -> int:
             if not storage.db.integrity_ok():
                 say("integrity check failed")
                 return 1
+            from supplier_app.database.errors import PG_AVAILABLE
+
+            if not PG_AVAILABLE:
+                say("PostgreSQL driver (psycopg) is missing")
+                return 1
+            import psycopg
+
+            say(f"PostgreSQL driver psycopg {psycopg.__version__}, libpq {psycopg.pq.version()}")
             from supplier_app.main import build_context
             from supplier_app.selfcheck_ui import check_all_screens
 

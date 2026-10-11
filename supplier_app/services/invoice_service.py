@@ -11,7 +11,7 @@ from supplier_app.models.entities import DocumentReference, Invoice
 from supplier_app.models.enums import EntityKind, InvoiceStatus, LedgerEntryType, PartyRole, ReferenceType
 from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import Repositories
-from supplier_app.services.base import ServiceBase, today
+from supplier_app.services.base import ServiceBase, atomic, today
 from supplier_app.services.case_service import CaseService
 from supplier_app.services.ledger_service import LedgerService
 from supplier_app.services.organization_service import OrganizationService
@@ -67,6 +67,7 @@ class InvoiceService(ServiceBase):
             return False
         return self.repos.references.add(DocumentReference(owner_kind.value, owner_id, ref_type, raw.strip(), norm)) is not None
 
+    @atomic
     def create_invoice(
         self,
         supplier_id: int,
@@ -116,6 +117,7 @@ class InvoiceService(ServiceBase):
             self._audit("create", "invoice", invoice.id, invoice.invoice_number)
         return invoice
 
+    @atomic
     def update_details(
         self, invoice_id: int, *, due_date: date | None = None, notes: str | None = None,
         category_id: int | None = None,
@@ -134,6 +136,7 @@ class InvoiceService(ServiceBase):
         self._audit("update", "invoice", invoice_id)
         return invoice
 
+    @atomic
     def change_due_date(self, invoice_id: int, due_date: date) -> Invoice:
         """Edit the Fälligkeitsdatum later on; the change is audited and noted in the case timeline."""
         invoice = self.get(invoice_id)
@@ -148,6 +151,7 @@ class InvoiceService(ServiceBase):
             self.cases.add_event(case.id, "due_date", f"Fälligkeit geändert: {old_text} → {due_date.strftime('%d.%m.%Y')}")
         return invoice
 
+    @atomic
     def assign_scope(self, invoice_id: int, company_id: int | None, hotel_id: int | None) -> Invoice:
         """(Re)assign the invoice to a hotel (its company follows automatically) or to a company only."""
         invoice = self.get(invoice_id)
@@ -159,6 +163,7 @@ class InvoiceService(ServiceBase):
         invoice.company_id, invoice.hotel_id = company_id, hotel_id
         return invoice
 
+    @atomic
     def credit_note(self, invoice_id: int, amount_cents: int, on: date, comment: str = "",
                     document_id: int | None = None) -> None:
         invoice = self.get(invoice_id)
@@ -170,6 +175,7 @@ class InvoiceService(ServiceBase):
                              comment=comment or "Gutschrift")
             self._after_change(invoice_id)
 
+    @atomic
     def write_off(self, invoice_id: int, amount_cents: int, on: date, comment: str = "") -> None:
         invoice = self.get(invoice_id)
         open_cents = self.ledger.invoice_balance(invoice_id).balance_cents
@@ -180,6 +186,7 @@ class InvoiceService(ServiceBase):
                              amount_cents=-amount_cents, invoice_id=invoice_id, comment=comment or "Ausbuchung")
             self._after_change(invoice_id)
 
+    @atomic
     def adjustment(self, invoice_id: int, signed_cents: int, on: date, comment: str) -> None:
         invoice = self.get(invoice_id)
         if signed_cents == 0:
@@ -191,6 +198,7 @@ class InvoiceService(ServiceBase):
                              amount_cents=signed_cents, invoice_id=invoice_id, comment=comment)
             self._after_change(invoice_id)
 
+    @atomic
     def set_disputed(self, invoice_id: int, disputed: bool) -> InvoiceStatus:
         invoice = self.get(invoice_id)
         if invoice.status == InvoiceStatus.CANCELLED:
@@ -202,6 +210,7 @@ class InvoiceService(ServiceBase):
             self._audit("disputed" if disputed else "undisputed", "invoice", invoice_id)
         return status
 
+    @atomic
     def cancel_invoice(self, invoice_id: int, reason: str = "") -> None:
         """Reverse every active entry of the invoice and mark it cancelled."""
         invoice = self.get(invoice_id)

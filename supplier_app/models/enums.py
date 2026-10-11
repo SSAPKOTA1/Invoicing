@@ -5,6 +5,14 @@ from __future__ import annotations
 from enum import Enum, IntEnum
 
 
+class UserRole(str, Enum):
+    """Roles of the multi-user mode: admin (users, server, everything), editor (books and imports), viewer (read only)."""
+
+    ADMIN = "admin"
+    EDITOR = "editor"
+    VIEWER = "viewer"
+
+
 class PartyRole(str, Enum):
     SUPPLIER = "supplier"
     COLLECTION_AGENCY = "collection_agency"

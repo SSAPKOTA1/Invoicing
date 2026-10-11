@@ -187,7 +187,7 @@ def test_dashboard_loads_fast_with_50k_entries(svc) -> None:
     data = ds.build(flt)
     elapsed = time.perf_counter() - start
     print(f"dashboard build with 50k entries: {elapsed * 1000:.0f} ms")
-    limit = 1.5 if os.environ.get("CI") else 0.5  # shared CI runners are slower than a desktop
+    limit = 1.5 if os.environ.get("CI") or db.backend == "postgres" else 0.5  # CI runners / a server round trip are slower
     assert elapsed < limit, f"{elapsed:.3f}s"
     assert data.kpis["total_open"].value == sum(data.aging.values()) > 0
     assert DunningLevel.REMINDER == 1

@@ -12,7 +12,7 @@ from supplier_app.models.entities import DocumentReference, DunningNotice, Ledge
 from supplier_app.models.enums import DunningLevel, EntityKind, PartyRole, ReferenceType
 from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import Repositories
-from supplier_app.services.base import ServiceBase
+from supplier_app.services.base import ServiceBase, atomic
 from supplier_app.services.case_service import CaseService
 from supplier_app.services.ledger import NoticeClaim, NoticeReconciliation, plan_notice_postings
 from supplier_app.services.ledger_service import LedgerService
@@ -100,6 +100,7 @@ class DunningService(ServiceBase):
         return self.repos.notices.find_by_dedup_key(self.dedup_key(supplier_id, draft))
 
     # -- booking -----------------------------------------------------------------
+    @atomic
     def book_notice(self, draft: NoticeDraft) -> BookedNotice:
         """Store the notice, post only the additional charges, open the case, remember references."""
         if not draft.claims:
@@ -197,6 +198,7 @@ class DunningService(ServiceBase):
     ) -> list[DunningNotice]:
         return self.repos.notices.list(supplier_id=supplier_id, invoice_id=invoice_id, scope=scope)
 
+    @atomic
     def update_deadline(self, notice_id: int, deadline: date) -> DunningNotice:
         """Edit the payment deadline printed on a notice later on (audited, noted in the case timeline)."""
         notice = self.get(notice_id)

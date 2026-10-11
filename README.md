@@ -84,6 +84,27 @@ Netto, MwSt und Brutto werden gegeneinander geprüft (Netto + MwSt = Brutto). Fe
 
 Berichte → **Druckvorschau …** / **Drucken …**: A4 mit Kopfzeile (Titel, Filter, Gesellschaft/Hotel), wiederholter Tabellenkopf auf jeder Seite und „Seite x von y“. Breite Tabellen werden quer gedruckt (in der Vorschau/im Druckdialog änderbar). Über einen PDF-Drucker lässt sich auch eine PDF-Datei erzeugen.
 
+### Mehrbenutzer-Betrieb (mehrere Personen gleichzeitig)
+
+Die Daten liegen dann **nicht** in einer Datei auf einem PC oder Netzlaufwerk (SQLite ist dafür nicht geeignet), sondern auf einem **PostgreSQL-Server** im Firmennetz. Jeder Benutzer startet die App auf seinem eigenen PC und meldet sich mit eigenem Namen und Passwort an. Änderungen von Kollegen erscheinen nach wenigen Sekunden automatisch; gleichzeitige Buchungen werden sicher nacheinander verarbeitet (keine doppelten Zahlungen, keine doppelten Rechnungsnummern).
+
+**Einmalig auf dem Server-PC (IT):**
+1. PostgreSQL 16 oder neuer installieren (kostenlos, postgresql.org) und das Passwort des Administrators `postgres` merken.
+2. `scripts/setup_server.sql` öffnen, das Passwort ändern und ausführen: `psql -U postgres -f setup_server.sql` (legt Benutzer und Datenbank `supplierapp` an).
+3. Netzwerk freigeben: in `postgresql.conf` `listen_addresses = '*'` (oder die Server-Adresse), in `pg_hba.conf` eine Zeile `hostssl supplierapp supplierapp 192.168.1.0/24 scram-sha-256` (Adressbereich des Firmennetzes anpassen), Port 5432 nur im internen Netz in der Firewall öffnen. Verschlüsselung (`ssl = on` mit Zertifikat) wird empfohlen.
+
+**Auf jedem PC:** Einstellungen → *Datenbank / Mehrbenutzer* → **Verbindung ändern …** → „Mehrbenutzer“ wählen, Server, Datenbank (`supplierapp`), Benutzer und Passwort eintragen, *Verbindung testen*, speichern, App neu starten. Beim allerersten Start legen Sie den Administrator an; dieser legt unter *Einstellungen → Benutzer* die Kollegen an. Rollen: **Administrator** (alles, Benutzer, Server), **Bearbeiter** (importieren, buchen, Berichte), **Lesen** (nur ansehen und drucken; die Datenbank verweigert jede Änderung).
+
+**Bestehende Daten übernehmen:** Auf dem PC mit den bisherigen Daten Einstellungen → *Daten auf einen Server übertragen …* (der Server muss leer sein; die lokalen Daten bleiben als Kopie erhalten). Belege und Dokumentdateien werden mit übertragen.
+
+**Gut zu wissen**
+* Dokumentdateien liegen in der Datenbank, jeder PC hält nur einen lokalen Zwischenspeicher.
+* Das Datenbank-Passwort wird auf dem jeweiligen PC in `connection.json` gespeichert (Option „Passwort speichern“); die Benutzerpasswörter werden nur als Hash abgelegt. Persönliche Einstellungen (Design, gewählte Gesellschaft/Hotel) bleiben auf dem eigenen PC.
+* Sicherung: *Einstellungen → Sicherung* erstellt eine ZIP-Datei mit allen Tabellen und Dokumenten (Wiederherstellen ersetzt die Server-Daten, nur Administratoren). Zusätzlich empfiehlt sich eine nächtliche Sicherung des Servers mit `pg_dump -Fc -U supplierapp supplierapp > supplierapp.dump`.
+* Alle PCs müssen dieselbe Programmversion verwenden; ein PC mit neuerer Version aktualisiert die Datenbank beim Start, ältere Versionen melden dann, dass sie aktualisiert werden müssen.
+* Die Volltextsuche im Server-Modus findet Wortanfänge ohne Rücksicht auf Groß-/Kleinschreibung und Umlaute (ü = u), arbeitet aber auf dem Wortstamm-freien „simple“-Wörterbuch.
+* Ausgelegt für kleine Teams (bis ca. 20 gleichzeitige Benutzer); Buchungen werden aus Sicherheitsgründen serverweit nacheinander ausgeführt.
+
 ### PIN-Sperre (optional)
 
 *Einstellungen → Sicherheit*: PIN mit 4–8 Ziffern (scrypt-Hash mit Salt), nach 5 Fehlversuchen steigende Wartezeit, automatische

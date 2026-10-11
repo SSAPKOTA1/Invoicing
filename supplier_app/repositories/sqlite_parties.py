@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
+from supplier_app.database.errors import INTEGRITY_ERRORS
 from supplier_app.errors import DuplicateError, NotFoundError
 from supplier_app.models.entities import Party
 from supplier_app.models.enums import PartyRole
@@ -56,7 +57,7 @@ class SqlitePartyRepository(SqliteRepo, PartyRepository):
                  party.represents_supplier_id, party.created_at),
             )
             self._write_children(party)
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError(f"Der Datensatz '{party.name}' ist ungültig oder doppelt.") from exc
         return party
 
@@ -72,7 +73,7 @@ class SqlitePartyRepository(SqliteRepo, PartyRepository):
                  party.represents_supplier_id, party.id),
             )
             self._write_children(party)
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError(f"Der Datensatz '{party.name}' ist ungültig oder doppelt.") from exc
 
     def get(self, party_id: int) -> Party | None:
@@ -81,10 +82,10 @@ class SqlitePartyRepository(SqliteRepo, PartyRepository):
 
     def list(self, role: PartyRole | None = None) -> list[Party]:
         if role is None:
-            rows = self.db.query_all(f"SELECT {_COLS} FROM parties ORDER BY name COLLATE NOCASE")
+            rows = self.db.query_all(f"SELECT {_COLS} FROM parties ORDER BY lower(name)")
         else:
             rows = self.db.query_all(
-                f"SELECT {_COLS} FROM parties WHERE role=? ORDER BY name COLLATE NOCASE", (role.value,)
+                f"SELECT {_COLS} FROM parties WHERE role=? ORDER BY lower(name)", (role.value,)
             )
         return [self._hydrate(r) for r in rows]
 
@@ -131,7 +132,7 @@ class SqlitePartyRepository(SqliteRepo, PartyRepository):
         rows = self.db.query_all(
             f"SELECT {_COLS} FROM parties WHERE name_norm LIKE ? ESCAPE '\\' OR lower(name) LIKE ? ESCAPE '\\'"
             " OR id IN (SELECT party_id FROM party_aliases WHERE alias_norm LIKE ? ESCAPE '\\')"
-            " ORDER BY name COLLATE NOCASE",
+            " ORDER BY lower(name)",
             (pattern, f"%{like_escape(norm_fragment.lower())}%", pattern),
         )
         return [self._hydrate(r) for r in rows]

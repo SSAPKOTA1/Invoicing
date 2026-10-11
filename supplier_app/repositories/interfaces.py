@@ -7,6 +7,7 @@ from datetime import date
 from typing import Any
 
 from supplier_app.models.entities import (
+    AppUser,
     AuditLogEntry,
     Case,
     CaseEvent,
@@ -182,6 +183,11 @@ class DocumentRepository(ABC):
         scope: Scope | None = None,
     ) -> list[Document]: ...
     @abstractmethod
+    def save_file(self, doc_id: int, content: bytes) -> None:
+        """Keep the document file itself in the database (multi-user mode: all users see the same files)."""
+    @abstractmethod
+    def load_file(self, doc_id: int) -> bytes | None: ...
+    @abstractmethod
     def fulltext(self, fts_query: str, limit: int = 50) -> list[tuple[int, str]]:
         """``(document_id, snippet)`` for an FTS5 query."""
     @abstractmethod
@@ -253,6 +259,25 @@ class AuditRepository(ABC):
     def list(self, *, limit: int = 200, entity: str | None = None) -> list[AuditLogEntry]: ...
 
 
+class UserRepository(ABC):
+    """Logins of the multi-user mode."""
+
+    @abstractmethod
+    def add(self, user: AppUser) -> AppUser: ...
+    @abstractmethod
+    def update(self, user: AppUser) -> None: ...
+    @abstractmethod
+    def get(self, user_id: int) -> AppUser | None: ...
+    @abstractmethod
+    def get_by_username(self, username: str) -> AppUser | None: ...
+    @abstractmethod
+    def list(self) -> list[AppUser]: ...
+    @abstractmethod
+    def count(self) -> int: ...
+    @abstractmethod
+    def delete(self, user_id: int) -> None: ...
+
+
 class OrganizationRepository(ABC):
     """Own companies (Gesellschaften) and their hotels."""
 
@@ -298,6 +323,7 @@ class Repositories(ABC):
     categories: CategoryRepository
     audit: AuditRepository
     organization: OrganizationRepository
+    users: UserRepository
 
     @abstractmethod
     def transaction(self) -> Any:

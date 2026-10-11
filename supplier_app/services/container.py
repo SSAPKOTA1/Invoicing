@@ -18,8 +18,11 @@ from supplier_app.services.organization_service import OrganizationService
 from supplier_app.services.payment_service import PaymentService
 from supplier_app.services.pin_service import PinService
 from supplier_app.services.search_service import SearchService
+from supplier_app.services.session import Session
 from supplier_app.services.settings_service import SettingsService
 from supplier_app.services.supplier_service import SupplierService
+from supplier_app.services.user_service import UserService
+from supplier_app.settings.local_prefs import LocalPrefs
 
 
 @dataclass
@@ -39,19 +42,22 @@ class Services:
     backup: BackupService
     ingest: IngestService
     organization: OrganizationService
+    users: UserService
+    session: Session
 
 
-def build_services(storage: Storage) -> Services:
+def build_services(storage: Storage, *, multi_user: bool = False, prefs: LocalPrefs | None = None) -> Services:
     repos = storage.repos
-    settings = SettingsService(repos)
+    settings = SettingsService(repos, prefs if multi_user else None)
     settings.ensure_defaults()
+    session = Session(multi_user=multi_user)
     ledger = LedgerService(repos, settings)
     cases = CaseService(repos)
     suppliers = SupplierService(repos)
     invoices = InvoiceService(repos, ledger, cases, settings)
     payments = PaymentService(repos, ledger, cases, settings)
     dunning = DunningService(repos, ledger, cases, settings)
-    documents = DocumentService(repos, storage.paths)
+    documents = DocumentService(repos, storage.paths, files_in_database=multi_user)
     ingest = IngestService(repos, documents, make_text_extractor(settings), settings, ledger, suppliers, invoices,
                            payments, dunning)
     return Services(
@@ -70,4 +76,6 @@ def build_services(storage: Storage) -> Services:
         backup=BackupService(storage.db, storage.paths),
         ingest=ingest,
         organization=OrganizationService(repos),
+        users=UserService(repos, session),
+        session=session,
     )

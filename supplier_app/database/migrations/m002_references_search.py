@@ -45,3 +45,14 @@ END;
 
 INSERT INTO document_fts(document_fts) VALUES ('rebuild');
 """
+
+PG_EXTRA = [
+    # full text search over file name and OCR text (replaces the SQLite FTS5 table): lower case, punctuation removed,
+    # German umlauts and common accents folded so that "uberweisung" finds "Überweisung" like FTS5's remove_diacritics
+    """CREATE FUNCTION fts_norm(t text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+SELECT translate(regexp_replace(lower(coalesce(t, '')), '[^[:alnum:]]+', ' ', 'g'),
+                 'äöüéèêëàáâíìîïóòôúùûçñ', 'aoueeeeaaaiiiiooouuucn')
+$$""",
+    "CREATE INDEX ix_documents_fts ON documents USING GIN "
+    "(to_tsvector('simple', fts_norm(coalesce(original_name, '') || ' ' || coalesce(ocr_text, ''))))",
+]

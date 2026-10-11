@@ -24,7 +24,7 @@ from supplier_app.models.enums import (
 from supplier_app.ocr.pipeline import ExtractedText, TextExtractor
 from supplier_app.ocr.tesseract import TesseractRunner
 from supplier_app.repositories.interfaces import Repositories
-from supplier_app.services.base import ServiceBase
+from supplier_app.services.base import ServiceBase, atomic
 from supplier_app.services.document_service import DocumentService, sha256_of
 from supplier_app.services.dunning_service import DunningService, NoticeDraft
 from supplier_app.services.invoice_service import InvoiceService
@@ -269,6 +269,7 @@ class IngestService(ServiceBase):
             review.supplier_id = analysis.candidates[0].supplier_id
 
     # -- confirmation -------------------------------------------------------------
+    @atomic
     def confirm(self, review: ReviewData) -> ConfirmResult:
         """Book the confirmed data in one transaction. Raises on invalid or duplicate input."""
         doc = self.documents.get(review.document_id)
@@ -300,6 +301,7 @@ class IngestService(ServiceBase):
                 return inv.company_id, inv.hotel_id
         return self.organization.resolve(review.company_id, review.hotel_id)
 
+    @atomic
     def reject(self, doc_id: int) -> None:
         self.documents.set_review_status(doc_id, ReviewStatus.REJECTED)
 

@@ -6,6 +6,7 @@ import sqlite3
 from datetime import date
 from decimal import Decimal
 
+from supplier_app.database.errors import INTEGRITY_ERRORS
 from supplier_app.errors import DuplicateError, LedgerError, NotFoundError
 from supplier_app.models.entities import Invoice, LedgerEntry
 from supplier_app.models.enums import InvoiceStatus, LedgerEntryType
@@ -63,7 +64,7 @@ class SqliteInvoiceRepository(SqliteRepo, InvoiceRepository):
                  invoice.vat_cents, invoice.gross_cents, invoice.currency, invoice.status.value, invoice.notes,
                  invoice.category_id, invoice.company_id, invoice.hotel_id, invoice.created_at),
             )
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError(
                 f"Rechnung '{invoice.invoice_number}' existiert für diesen Lieferanten bereits oder ist ungültig."
             ) from exc
@@ -82,7 +83,7 @@ class SqliteInvoiceRepository(SqliteRepo, InvoiceRepository):
                  invoice.gross_cents, invoice.currency, invoice.status.value, invoice.notes, invoice.category_id,
                  invoice.company_id, invoice.hotel_id, invoice.id),
             )
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError("Rechnungsnummer ist bereits vergeben oder ungültig.") from exc
 
     def get(self, invoice_id: int) -> Invoice | None:
@@ -129,7 +130,7 @@ class SqliteInvoiceRepository(SqliteRepo, InvoiceRepository):
     def set_scope(self, invoice_id: int, company_id: int | None, hotel_id: int | None) -> None:
         try:
             self.db.execute("UPDATE invoices SET company_id=?, hotel_id=? WHERE id=?", (company_id, hotel_id, invoice_id))
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError("Das Hotel gehört nicht zu dieser Gesellschaft.") from exc
 
     def find_by_gross(self, gross_cents: int, supplier_id: int | None = None) -> list[Invoice]:
@@ -171,7 +172,7 @@ class SqliteLedgerRepository(SqliteRepo, LedgerRepository):
                  entry.category_type.value, entry.amount_cents, entry.document_id, entry.notice_id,
                  entry.payment_id, entry.reverses_entry_id, entry.comment, entry.created_at),
             )
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise LedgerError(f"Buchung verletzt eine Ledger-Regel: {exc}") from exc
         return entry
 
@@ -251,7 +252,8 @@ class SqliteLedgerRepository(SqliteRepo, LedgerRepository):
         month_buckets: bool = False, scope: Scope | None = None,
     ) -> list[tuple[str, str, int]]:
         bucket = "substr(e.entry_date,1,7)" if month_buckets else "''"
-        rows = self._filtered(f"{bucket}, e.category_type, SUM(e.amount_cents)", f" GROUP BY {bucket}, e.category_type",
+        group = f"{bucket}, e.category_type" if month_buckets else "e.category_type"
+        rows = self._filtered(f"{bucket}, e.category_type, SUM(e.amount_cents)", f" GROUP BY {group}",
                               "1=1", as_of=None, supplier_id=supplier_id, scope=scope, date_from=date_from,
                               date_to=date_to)
         return [(r[0], r[1], r[2]) for r in rows]

@@ -57,3 +57,19 @@ BEGIN
     SELECT RAISE(ABORT, 'hotel does not belong to the company');
 END;
 """
+
+PG_EXTRA = [
+    """CREATE FUNCTION trg_hotel_company_check() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.hotel_id IS NOT NULL AND (SELECT company_id FROM hotels WHERE id = NEW.hotel_id) IS DISTINCT FROM NEW.company_id THEN
+        RAISE EXCEPTION 'hotel does not belong to the company' USING ERRCODE = '23000';
+    END IF;
+    RETURN NEW;
+END $$""",
+    "CREATE TRIGGER trg_invoices_hotel_ins BEFORE INSERT ON invoices FOR EACH ROW EXECUTE FUNCTION trg_hotel_company_check()",
+    "CREATE TRIGGER trg_invoices_hotel_upd BEFORE UPDATE OF company_id, hotel_id ON invoices "
+    "FOR EACH ROW EXECUTE FUNCTION trg_hotel_company_check()",
+    "CREATE TRIGGER trg_payments_hotel_ins BEFORE INSERT ON payments FOR EACH ROW EXECUTE FUNCTION trg_hotel_company_check()",
+    "CREATE TRIGGER trg_documents_hotel_upd BEFORE UPDATE OF company_id, hotel_id ON documents "
+    "FOR EACH ROW EXECUTE FUNCTION trg_hotel_company_check()",
+]

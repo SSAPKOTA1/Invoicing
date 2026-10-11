@@ -10,7 +10,7 @@ from supplier_app.models.entities import Case, CaseEvent
 from supplier_app.models.enums import CaseStatus, InvoiceStatus
 from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import Repositories
-from supplier_app.services.base import ServiceBase, today
+from supplier_app.services.base import ServiceBase, atomic, today
 
 
 class CaseService(ServiceBase):
@@ -23,6 +23,7 @@ class CaseService(ServiceBase):
             raise NotFoundError("Vorgang nicht gefunden.")
         return case
 
+    @atomic
     def ensure_for_invoice(self, invoice_id: int, *, auto: bool = True, on: date | None = None) -> Case:
         """Return the case of an invoice, opening it when it does not exist yet."""
         existing = self.repos.cases.get_by_invoice(invoice_id)
@@ -47,6 +48,7 @@ class CaseService(ServiceBase):
     def add_event(self, case_id: int, kind: str, text: str, on: date | None = None) -> CaseEvent:
         return self.repos.cases.add_event(CaseEvent(case_id, on or today(), kind, text))
 
+    @atomic
     def add_note(self, case_id: int, text: str) -> None:
         case = self.get(case_id)
         stamp = today().strftime("%d.%m.%Y")
@@ -54,6 +56,7 @@ class CaseService(ServiceBase):
         self.repos.cases.update(case)
         self.add_event(case_id, "note", text)
 
+    @atomic
     def set_status(self, case_id: int, status: CaseStatus) -> None:
         case = self.get(case_id)
         if case.status != status:

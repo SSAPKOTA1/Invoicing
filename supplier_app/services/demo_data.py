@@ -8,6 +8,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from supplier_app.errors import ValidationError
 from supplier_app.models.entities import Party
 from supplier_app.models.enums import DocumentType, DunningLevel, PartyRole, ReferenceType, ReviewStatus
 from supplier_app.services.dunning_service import NoticeDraft
@@ -53,6 +54,8 @@ class DemoDataService:
 
     def load(self, today: date | None = None) -> DemoSummary:
         svc = self.svc
+        if svc.session.multi_user:
+            raise ValidationError("Beispieldaten sind im Mehrbenutzer-Betrieb nicht verfügbar (gemeinsame Firmendaten).")
         t = today or date.today()
 
         def ago(n: int) -> date:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
+from supplier_app.database.errors import INTEGRITY_ERRORS
 from supplier_app.errors import DuplicateError, NotFoundError
 from supplier_app.models.entities import Company, Hotel
 from supplier_app.repositories.interfaces import OrganizationRepository
@@ -25,14 +26,14 @@ class SqliteOrganizationRepository(SqliteRepo, OrganizationRepository):
         try:
             company.id = self.db.insert("INSERT INTO companies(name, notes, created_at) VALUES (?,?,?)",
                                         (company.name.strip(), company.notes, company.created_at))
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError(f"Die Gesellschaft '{company.name}' existiert bereits oder ist leer.") from exc
         return company
 
     def update_company(self, company: Company) -> None:
         try:
             self.db.execute("UPDATE companies SET name=?, notes=? WHERE id=?", (company.name.strip(), company.notes, company.id))
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError(f"Die Gesellschaft '{company.name}' existiert bereits oder ist leer.") from exc
 
     def get_company(self, company_id: int) -> Company | None:
@@ -40,7 +41,7 @@ class SqliteOrganizationRepository(SqliteRepo, OrganizationRepository):
         return self._company(row) if row else None
 
     def companies(self) -> list[Company]:
-        return [self._company(r) for r in self.db.query_all("SELECT * FROM companies ORDER BY name COLLATE NOCASE")]
+        return [self._company(r) for r in self.db.query_all("SELECT * FROM companies ORDER BY lower(name)")]
 
     def company_has_items(self, company_id: int) -> bool:
         checks = ("SELECT 1 FROM invoices WHERE company_id=? LIMIT 1", "SELECT 1 FROM payments WHERE company_id=? LIMIT 1",
@@ -57,7 +58,7 @@ class SqliteOrganizationRepository(SqliteRepo, OrganizationRepository):
         try:
             hotel.id = self.db.insert("INSERT INTO hotels(company_id, name, notes, created_at) VALUES (?,?,?,?)",
                                       (hotel.company_id, hotel.name.strip(), hotel.notes, hotel.created_at))
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError(f"Das Hotel '{hotel.name}' existiert in dieser Gesellschaft bereits oder ist ungültig.") from exc
         return hotel
 
@@ -66,7 +67,7 @@ class SqliteOrganizationRepository(SqliteRepo, OrganizationRepository):
             raise NotFoundError("Hotel ohne ID.")
         try:
             self.db.execute("UPDATE hotels SET name=?, notes=? WHERE id=?", (hotel.name.strip(), hotel.notes, hotel.id))
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError(f"Das Hotel '{hotel.name}' existiert in dieser Gesellschaft bereits oder ist leer.") from exc
 
     def get_hotel(self, hotel_id: int) -> Hotel | None:
@@ -75,9 +76,9 @@ class SqliteOrganizationRepository(SqliteRepo, OrganizationRepository):
 
     def hotels(self, company_id: int | None = None) -> list[Hotel]:
         if company_id is None:
-            rows = self.db.query_all("SELECT * FROM hotels ORDER BY name COLLATE NOCASE")
+            rows = self.db.query_all("SELECT * FROM hotels ORDER BY lower(name)")
         else:
-            rows = self.db.query_all("SELECT * FROM hotels WHERE company_id=? ORDER BY name COLLATE NOCASE", (company_id,))
+            rows = self.db.query_all("SELECT * FROM hotels WHERE company_id=? ORDER BY lower(name)", (company_id,))
         return [self._hotel(r) for r in rows]
 
     def hotel_has_items(self, hotel_id: int) -> bool:

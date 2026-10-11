@@ -19,7 +19,7 @@ from supplier_app.models.enums import (
     ReferenceType,
 )
 from supplier_app.repositories.interfaces import Repositories
-from supplier_app.services.base import ServiceBase, today
+from supplier_app.services.base import ServiceBase, atomic, today
 from supplier_app.services.case_service import CaseService
 from supplier_app.services.ledger import (
     Allocation,
@@ -108,6 +108,7 @@ class PaymentService(ServiceBase):
         return PaymentPreview(result, rows)
 
     # -- booking ----------------------------------------------------------------
+    @atomic
     def record_payment(
         self,
         supplier_id: int,
@@ -189,6 +190,7 @@ class PaymentService(ServiceBase):
             self.cases.sync_with_invoice(invoice_id)
 
     # -- reversal ----------------------------------------------------------------
+    @atomic
     def reverse_payment(self, payment_id: int, reason: str = "", on: date | None = None) -> None:
         """Cancel a payment by reversal entries (and negative allocation rows)."""
         payment = self.repos.payments.get(payment_id)
@@ -224,6 +226,7 @@ class PaymentService(ServiceBase):
             out.append(UnappliedPayment(payment, e.id, -e.amount_cents))
         return out
 
+    @atomic
     def apply_credit(
         self, payment_id: int, invoice_ids: Sequence[int], rule: AllocationRule | None = None,
         manual: ManualAllocation | None = None, on: date | None = None,

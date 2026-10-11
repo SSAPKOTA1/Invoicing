@@ -6,7 +6,7 @@ from supplier_app.errors import NotFoundError, ValidationError
 from supplier_app.models.entities import Party
 from supplier_app.models.enums import PartyRole
 from supplier_app.repositories.interfaces import Repositories
-from supplier_app.services.base import ServiceBase
+from supplier_app.services.base import ServiceBase, atomic
 from supplier_app.util.normalize import normalize_iban, valid_iban, valid_vat_id
 
 
@@ -28,6 +28,7 @@ class SupplierService(ServiceBase):
             if self.repos.parties.get(party.represents_supplier_id) is None:
                 raise ValidationError("Der vertretene Lieferant existiert nicht.")
 
+    @atomic
     def create(self, party: Party) -> Party:
         self._validate(party)
         party.ibans = [normalize_iban(i) for i in party.ibans if i.strip()]
@@ -36,6 +37,7 @@ class SupplierService(ServiceBase):
             self._audit("create", "party", created.id, created.name)
         return created
 
+    @atomic
     def update(self, party: Party) -> None:
         self._validate(party)
         party.ibans = [normalize_iban(i) for i in party.ibans if i.strip()]
@@ -55,17 +57,20 @@ class SupplierService(ServiceBase):
     def suppliers(self) -> list[Party]:
         return self.repos.parties.list(PartyRole.SUPPLIER)
 
+    @atomic
     def delete(self, party_id: int) -> None:
         with self.repos.transaction():
             self.repos.parties.delete(party_id)
             self._audit("delete", "party", party_id)
 
+    @atomic
     def add_alias(self, party_id: int, alias: str) -> None:
         party = self.get(party_id)
         if alias.strip() and alias.strip() not in party.aliases:
             party.aliases.append(alias.strip())
             self.repos.parties.update(party)
 
+    @atomic
     def add_iban(self, party_id: int, iban: str) -> None:
         party = self.get(party_id)
         if not valid_iban(iban):

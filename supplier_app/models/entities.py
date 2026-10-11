@@ -17,6 +17,7 @@ from .enums import (
     PaymentMethod,
     ReferenceType,
     ReviewStatus,
+    UserRole,
 )
 
 
@@ -228,6 +229,27 @@ class InterestRate:
 
 
 @dataclass
+class AppUser:
+    """Login of the multi-user mode (password stored as scrypt hash + salt)."""
+
+    username: str
+    role: UserRole = UserRole.EDITOR
+    display_name: str = ""
+    id: int | None = None
+    password_hash: str = ""
+    password_salt: str = ""
+    active: bool = True
+    failed_logins: int = 0
+    locked_until: str = ""
+    created_at: str = ""
+    last_login: str = ""
+
+    @property
+    def label(self) -> str:
+        return self.display_name or self.username
+
+
+@dataclass
 class AuditLogEntry:
     action: str
     entity: str
@@ -235,3 +257,4 @@ class AuditLogEntry:
     details: str = ""
     id: int | None = None
     created_at: str = ""
+    username: str = ""

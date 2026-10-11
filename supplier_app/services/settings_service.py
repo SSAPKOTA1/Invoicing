@@ -12,6 +12,7 @@ from supplier_app.models.enums import AllocationRule
 from supplier_app.repositories.interfaces import Repositories
 from supplier_app.services.base import ServiceBase
 from supplier_app.services.ledger import RatePoint
+from supplier_app.settings.local_prefs import PER_USER_KEYS, LocalPrefs
 
 #: Bundesbank base rate (Basiszinssatz) history. DEFAULTS TO VERIFY - not legal advice.
 DEFAULT_BASE_RATES: list[tuple[date, str]] = [
@@ -45,17 +46,24 @@ DEFAULTS: dict[str, str] = {
 class SettingsService(ServiceBase):
     """Reads/writes settings with validation and defaults."""
 
-    def __init__(self, repos: Repositories) -> None:
+    def __init__(self, repos: Repositories, local_prefs: LocalPrefs | None = None) -> None:
         super().__init__(repos)
+        self.local_prefs = local_prefs  # multi-user mode: personal settings live on this machine
 
     def get(self, key: str) -> str:
-        value = self.repos.settings.get(key)
+        if self.local_prefs is not None and key in PER_USER_KEYS:
+            value = self.local_prefs.get(key)
+        else:
+            value = self.repos.settings.get(key)
         if value is None:
             return DEFAULTS.get(key, "")
         return value
 
     def set(self, key: str, value: str) -> None:
-        self.repos.settings.set(key, str(value))
+        if self.local_prefs is not None and key in PER_USER_KEYS:
+            self.local_prefs.set(key, str(value))
+        else:
+            self.repos.settings.set(key, str(value))
 
     def get_int(self, key: str) -> int:
         try:

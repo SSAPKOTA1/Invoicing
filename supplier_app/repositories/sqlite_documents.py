@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import sqlite3
 
+from supplier_app.database.errors import INTEGRITY_ERRORS
 from supplier_app.errors import DatabaseError, DuplicateError, NotFoundError, ValidationError
 from supplier_app.models.entities import Case, CaseEvent, Document, DocumentReference
 from supplier_app.models.enums import CaseStatus, DocumentType, ReferenceType, ReviewStatus
@@ -36,7 +37,7 @@ class SqliteDocumentRepository(SqliteRepo, DocumentRepository):
                  doc.extraction_json, doc.review_status.value, doc.confidence, doc.supplier_id, doc.text_source,
                  doc.created_at),
             )
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError("Dieses Dokument wurde bereits importiert (gleicher Hash).") from exc
         return doc
 
@@ -85,6 +86,8 @@ class SqliteDocumentRepository(SqliteRepo, DocumentRepository):
         return [_document(r) for r in self.db.query_all(sql, params)]
 
     def fulltext(self, fts_query: str, limit: int = 50) -> list[tuple[int, str]]:
+        if getattr(self.db, "backend", "sqlite") == "postgres":
+            return self._fulltext_pg(fts_query, limit)
         try:
             rows = self.db.query_all(
                 "SELECT rowid, snippet(document_fts, 1, '[', ']', ' … ', 12) FROM document_fts"
@@ -94,6 +97,28 @@ class SqliteDocumentRepository(SqliteRepo, DocumentRepository):
         except DatabaseError as exc:
             raise ValidationError("Ungültige Suchanfrage.") from exc
         return [(r[0], r[1]) for r in rows]
+
+    def save_file(self, doc_id: int, content: bytes) -> None:
+        self.db.execute(
+            "INSERT INTO document_files(document_id, content) VALUES (?,?)"
+            " ON CONFLICT(document_id) DO UPDATE SET content=excluded.content", (doc_id, content))
+
+    def load_file(self, doc_id: int) -> bytes | None:
+        row = self.db.query_one("SELECT content FROM document_files WHERE document_id=?", (doc_id,))
+        return bytes(row[0]) if row else None
+
+    def _fulltext_pg(self, fts_query: str, limit: int) -> list[tuple[int, str]]:
+        """PostgreSQL text search over file name + OCR text (prefix match per word, all words must occur)."""
+        words = [fold_word(w) for w in re.findall(r'"([^"]+)"\*', fts_query)]
+        words = [w for w in words if w]
+        if not words:
+            raise ValidationError("Ungültige Suchanfrage.")
+        tsquery = " & ".join(f"'{w}':*" for w in words)
+        vec = "to_tsvector('simple', fts_norm(coalesce(d.original_name, '') || ' ' || coalesce(d.ocr_text, '')))"
+        rows = self.db.query_all(
+            f"SELECT d.id, d.ocr_text FROM documents d, to_tsquery('simple', ?) q WHERE {vec} @@ q "
+            f"ORDER BY ts_rank({vec}, q) DESC LIMIT ?", (tsquery, limit))
+        return [(r[0], _snippet(r[1], words)) for r in rows]
 
     def count_by_status(self) -> dict[str, int]:
         return {r[0]: r[1] for r in self.db.query_all("SELECT review_status, COUNT(*) FROM documents GROUP BY 1")}
@@ -115,7 +140,7 @@ class SqliteReferenceRepository(SqliteRepo, ReferenceRepository):
                 " created_at) VALUES (?,?,?,?,?,?)",
                 (ref.owner_kind, ref.owner_id, ref.ref_type.value, ref.raw_value, ref.normalized_value, stamp("")),
             )
-        except sqlite3.IntegrityError:
+        except INTEGRITY_ERRORS:
             return None
         return ref
 
@@ -158,7 +183,7 @@ class SqliteCaseRepository(SqliteRepo, CaseRepository):
                 (case.supplier_id, case.invoice_id, case.title, case.status.value, case.notes,
                  int(case.auto_opened), case.opened_at),
             )
-        except sqlite3.IntegrityError as exc:
+        except INTEGRITY_ERRORS as exc:
             raise DuplicateError("Für diese Rechnung existiert bereits ein Vorgang.") from exc
         return case
 
@@ -214,3 +239,26 @@ def fts_query_from_text(text: str) -> str:
     """Turn free user text into a safe FTS5 prefix query (``abc def -> "abc"* "def"*``)."""
     tokens = re.findall(r"[\w]+", text, flags=re.UNICODE)
     return " ".join(f'"{t}"*' for t in tokens)
+
+
+_FOLD = str.maketrans("äöüéèêëàáâíìîïóòôúùûçñ", "aoueeeeaaaiiiiooouuucn")
+
+
+def fold_word(word: str) -> str:
+    """Lower case + accent folding (same as the ``fts_norm`` function of the PostgreSQL schema)."""
+    return re.sub(r"[^\w]", "", word.lower().translate(_FOLD))
+
+
+def _snippet(text: str, words: list[str]) -> str:
+    """A short excerpt around the first match with the match in [brackets] (like FTS5's snippet())."""
+    folded = text.lower().translate(_FOLD)  # same length as the text: positions carry over
+    for word in words:
+        pos = folded.find(word)
+        if pos >= 0:
+            end = pos
+            while end < len(text) and (text[end].isalnum() or text[end] in "-_"):
+                end += 1
+            start, stop = max(0, pos - 40), min(len(text), end + 60)
+            body = f"{text[start:pos]}[{text[pos:end]}]{text[end:stop]}".replace("\n", " ")
+            return ("… " if start else "") + body.strip() + (" …" if stop < len(text) else "")
+    return text[:80].replace("\n", " ")
