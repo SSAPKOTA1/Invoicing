@@ -457,5 +457,14 @@
  "review.due_label": "Fälligkeitsdatum",
  "review.due_plus": "+{n} Tage",
  "review.due_plus.hint": "Die Tage-Schaltflächen rechnen ab dem Rechnungsdatum bzw. Mahndatum.",
- "review.due_plus.tip": "Fälligkeit = Rechnungsdatum + {n} Tage"
+ "review.due_plus.tip": "Fälligkeit = Rechnungsdatum + {n} Tage",
+ "settings.vocab": "Erkennung: eigene Begriffe",
+ "settings.vocab.hint": "Die Erkennung kennt bereits viele Begriffe (Rechnung, Beleg, Faktura, Facture, Fattura …, Netto/Brutto, Summe/Total/Gesamtbetrag, MwSt …). Verwendet ein Lieferant ein anderes Wort, tragen Sie es hier ein (mehrere mit Komma trennen). Wirkt beim nächsten Import bzw. beim erneuten Prüfen.",
+ "settings.vocab.invoice_title": "Überschrift einer Rechnung (z. B. Lieferantenabrechnung)",
+ "settings.vocab.invoice_number": "Rechnungsnummer (z. B. Vorgang-Nr.)",
+ "settings.vocab.net": "Nettobetrag (z. B. Warenwert ohne Steuer)",
+ "settings.vocab.vat": "MwSt-Betrag (z. B. Steueranteil)",
+ "settings.vocab.gross": "Gesamt-/Bruttobetrag (z. B. Zahlungsbetrag)",
+ "settings.vocab.document_date": "Rechnungsdatum (z. B. Ausgabedatum)",
+ "settings.vocab.due_date": "Fälligkeit (z. B. Zahlung erbeten bis)"
 }

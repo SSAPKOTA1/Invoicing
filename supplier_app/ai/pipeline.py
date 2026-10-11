@@ -13,8 +13,10 @@ from .interfaces import DocumentClassifier, FieldExtractor, LinkMatcher, SenderM
 from .linker import RuleLinkMatcher
 from .references import LabelledReferenceExtractor
 from .result_types import DocumentAnalysis, ExtractedFields, SenderMatch, ValidationIssue
+from .rules import CLASSIFIER_RULES
 from .sender import RuleSenderMatcher
 from .validation import validate_fields
+from .vocab import ExtraVocab
 
 _KEY_FIELDS: dict[D, tuple[str, ...]] = {
     D.INVOICE: ("invoice_number", "document_date", "gross", "sender"),
@@ -77,9 +79,13 @@ class AnalysisPipeline:
 
 def build_default_pipeline(repos: Repositories, ledger: LedgerService, settings: SettingsService) -> AnalysisPipeline:
     """Rule based pipeline wired to the master data."""
+    extra = ExtraVocab.from_settings(settings.custom_vocab())
+    rules = {k: list(v) for k, v in CLASSIFIER_RULES.items()}
+    rules[D.INVOICE] = [*rules[D.INVOICE], *((rf"^\s*(?:{p})\b", 6.0) for p in extra.patterns("invoice_title")),
+                        *((rf"\b(?:{p})\b", 2.0) for p in extra.patterns("invoice_title"))]
     return AnalysisPipeline(
-        KeywordClassifier(),
-        RegexFieldExtractor(LabelledReferenceExtractor(settings.reference_rules())),
+        KeywordClassifier(rules),
+        RegexFieldExtractor(LabelledReferenceExtractor(settings.reference_rules()), extra),
         RuleSenderMatcher(repos.parties),
         RuleLinkMatcher(repos, ledger),
     )

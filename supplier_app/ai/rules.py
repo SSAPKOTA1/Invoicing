@@ -10,10 +10,28 @@ from supplier_app.models.enums import ReferenceType as R
 # (regex, weight). Patterns matched inside the title zone (first lines) get TITLE_BONUS times the weight.
 CLASSIFIER_RULES: dict[D, list[tuple[str, float]]] = {
     D.INVOICE: [
-        (r"^\s*rechnung\s*$", 6), (r"^\s*invoice\s*$", 6), (r"\brechnungs(?:nummer|datum|betrag|nr)\b", 3),
-        (r"\binvoice\s*(?:no\b|number|date|#)", 3), (r"\binvoice\b", 1.5), (r"\bzahlbar\s+bis\b", 1),
-        (r"\b(?:due date|payment due)\b", 1), (r"\b(?:mwst|ust|vat)\b", 0.8), (r"\bnettobetrag\b|\bnet amount\b", 1),
-        (r"\bleistungsdatum\b|\blieferdatum\b", 1), (r"\bbankverbindung\b", 0.5),
+        # title line: "Rechnung", "Beleg", "Facture", "Fattura", "Tax invoice", "Rechnung Nr. 55-1021" (but not a table row with amounts)
+        (r"^\s*(?:tax\s+)?(?:rechnu\s?ng|invoice|facture|fattura|factura|factuur|faktura|beleg|honorarnote|honorarrechnung|abrechnung|"
+         r"kundenrechnung|sammelrechnung|schlussrechnung|teilrechnung|abschlagsrechnung|handwerkerrechnung|proforma(?:\s*-?\s*rechnung)?|"
+         r"rechnungskopie|rechnungsduplikat)\b(?!.*\d[.,]\d{2}\b)(?:\s*(?:nr\.?|nummer|no\.?|n°|#|vom|du|del|dated)\b.*|\s*[-–:(/].*)?\s*$", 6),
+        (r"\brechnungs(?:nummer|datum|betrag|nr|summe)\b", 3), (r"\bbeleg\s?-?\s?(?:nr|nummer|datum|no)\b", 3),
+        (r"\b(?:faktura|abrechnungs|honorar)\s?-?\s?(?:nr|nummer|datum)\b", 3),
+        (r"\binvoice\s*(?:no\b|number|date|#|total)", 3), (r"\b(?:invoice|rechnung|facture|fattura|factura|factuur|faktura)\b", 1.5),
+        (r"\bfacture\s*(?:n[°ºo]|no|nr|num)|\bdate\s+de\s+facture|\bmontant\s+(?:ht|ttc)\b|\btotal\s+(?:ht|ttc)\b|\bnet\s+à\s+payer\b", 3),
+        (r"\bfattura\s*(?:n|nr|num)|\bdata\s+fattura|\bimponibile\b|\btotale\s+(?:documento|fattura)\b", 3),
+        (r"\bfactura\s*(?:n|nº|núm|num)|\bbase\s+imponible\b|\btotal\s+factura\b|\bfecha\s+de\s+factura\b", 3),
+        (r"\bfactuur(?:nummer|datum)\b|\bsubtotaal\b|\bbtw\b", 3),
+        (r"\b(?:tax\s+invoice|pro\s?-?\s?forma)\b", 3),
+        (r"\bzahlbar\s+(?:bis|innerhalb|binnen|sofort|netto)\b", 1),
+        (r"\b(?:due date|payment due|amount due|amount payable|balance due|grand total|subtotal)\b", 1),
+        (r"\b(?:mwst|ust|vat|tva|iva)\b|\b(?:umsatzsteuer|mehrwertsteuer)\b", 0.8),
+        (r"\bnetto\b|\bnettobetrag\b|\bnet amount\b", 1.2), (r"\bbrutto\b|\bbruttobetrag\b", 1.2),
+        (r"\b(?:zwischensumme|gesamtbetrag|endsumme|zahlungsziel|zahlungsbedingungen)\b", 0.8),
+        (r"\bleistungsdatum\b|\blieferdatum\b|\bleistungszeitraum\b", 1), (r"\bbankverbindung\b|\bUSt-?Id", 0.5),
+        (r"\bzzgl\.?\s*\d{1,2}(?:[.,]\d+)?\s*%", 1),
+        # offers, orders and quotes also show net/gross/VAT but are not invoices
+        (r"^\s*(?:angebot|kostenvoranschlag|auftragsbestätigung|bestellung|offerte|quotation|quote|estimate|devis|preventivo|"
+         r"presupuesto|proposal)\b", -8),
     ],
     D.CREDIT_NOTE: [
         (r"^\s*gutschrift\b", 7), (r"\bgutschrifts(?:nummer|betrag)\b", 4), (r"\bcredit note\b", 6),
@@ -132,7 +150,9 @@ DATE_LABELS = {
 
 LEGAL_FORM_RE = re.compile(
     r"\b(?:gmbh|ag|kg|ug|ohg|gbr|mbh|e\.?\s?k\.?|ltd\.?|inc\.?|llc|se|kgaa|e\.?\s?v\.?|co\.|partner|inkasso|"
-    r"amtsgericht|mahngericht|bank|versicherung)\b", re.I)
+    r"amtsgericht|mahngericht|bank|versicherung|sarl|sàrl|s\.a\.r\.l\.?|sas|srl|s\.r\.l\.?|s\.p\.a\.?|b\.v\.?|bv|n\.v\.?|"
+    r"s\.l\.u?\.?|oy|plc|e\.u\.|ges\.m\.b\.h\.?|inh\.|einzelunternehmen|handels?|service|services|großhandel|"
+    r"gebäudereinigung|elektro|sanitär|metzgerei|bäckerei|gärtnerei|druckerei|weingut|autohaus)\b", re.I)
 
 
 _SPLIT_PREFIXES = (

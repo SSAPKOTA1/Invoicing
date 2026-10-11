@@ -644,3 +644,17 @@ def test_reports_print_preview_and_pdf(win, demo_ctx, tmp_path, monkeypatch) -> 
     rp.print_report()
     rp.preview()
     assert rp.print_pdf(str(tmp_path / "none.pdf")) is None
+
+
+def test_settings_vocabulary_card_saves_and_reloads(win, demo_ctx) -> None:
+    app, ctrl, window = win
+    window.show_page("settings")
+    sp = window.pages["settings"]
+    sp.vocab_edits["gross"].setText("Zahlungsbetrag, Rechnungs-Endbetrag")
+    sp.vocab_edits["invoice_title"].setText("Lieferantenabrechnung")
+    sp._save_vocab()
+    assert demo_ctx.services.settings.custom_vocab() == {"invoice_title": ["Lieferantenabrechnung"],
+                                                         "gross": ["Zahlungsbetrag", "Rechnungs-Endbetrag"]}
+    sp.vocab_edits["gross"].setText("")
+    sp.refresh()
+    assert sp.vocab_edits["gross"].text() == "Zahlungsbetrag, Rechnungs-Endbetrag"

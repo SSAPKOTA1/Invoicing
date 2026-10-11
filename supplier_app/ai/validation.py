@@ -34,6 +34,12 @@ def validate_fields(
                         "VAT_RATE", f"Die MwSt ({format_cents(vat)}) passt nicht zu {rate} % von {format_cents(net)}.", "vat"))
             except InvalidOperation:
                 pass
+        derived = sorted(fields.derived & {"net", "vat", "gross"})
+        if derived:
+            names = {"net": "Netto", "vat": "MwSt", "gross": "Brutto"}
+            issues.append(ValidationIssue(
+                "AMOUNT_DERIVED", f"{' / '.join(names[k] for k in derived)} wurde aus den übrigen Beträgen berechnet "
+                f"und nicht im Dokument gelesen – bitte prüfen.", derived[0]))
         if gross is None:
             issues.append(ValidationIssue("MISSING_AMOUNT", "Kein Rechnungs-/Gutschriftsbetrag erkannt.", "gross", "error"))
         if dtype == D.INVOICE and not fields.invoice_numbers:

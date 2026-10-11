@@ -1,0 +1,267 @@
+{
+ "b2_stacked_pdf_columns": {
+  "text": "Sanitär Becker GmbH\nRechnung\nRechnungsnummer\nRechnungsdatum\nKundennummer\nSB-2024-0456\n18.05.2024\nK-2290\nNettobetrag\nUmsatzsteuer 19 %\nGesamtbetrag\n420,00 €\n79,80 €\n499,80 €\nZahlbar innerhalb von 14 Tagen ohne Abzug.\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "SB-2024-0456",
+   "date": "2024-05-18",
+   "due": "2024-06-01",
+   "net": 42000,
+   "vat": 7980,
+   "gross": 49980
+  }
+ },
+ "b2_eur_prefix_total": {
+  "text": "Hotel Lieferservice Fresh\nINVOICE\nInvoice No: FR-33091\nDate: 21.06.2024\nItems total          EUR 250,00\nTax 7%               EUR  17,50\nTotal                EUR 267,50\nPayment due: 05.07.2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "FR-33091",
+   "date": "2024-06-21",
+   "due": "2024-07-05",
+   "net": 25000,
+   "vat": 1750,
+   "gross": 26750
+  }
+ },
+ "b2_beleg_kassenbon_style": {
+  "text": "Metzgerei Huber\nBeleg Nr. 000123\nDatum 23.06.2024 14:35\n2x Leberkäs                 9,00\n1x Brezen                   1,50\nSumme                      10,50\nenthaltene MwSt 7 %         0,69\nNetto                       9,81\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "000123",
+   "date": "2024-06-23",
+   "net": 981,
+   "vat": 69,
+   "gross": 1050
+  }
+ },
+ "b2_brutto_netto_columns_reverse": {
+  "text": "Glaserei Roth\nRechnung Nr. 2024-310\nDatum: 12.07.2024\nBrutto          MwSt 19 %          Netto\n595,00          95,00              500,00\nZahlungsziel: 21 Tage\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-310",
+   "date": "2024-07-12",
+   "due": "2024-08-02",
+   "net": 50000,
+   "vat": 9500,
+   "gross": 59500
+  }
+ },
+ "b2_total_without_label_eur_suffix": {
+  "text": "Webhosting Pro GmbH\nRechnung RE-2024-5521\nRechnungsdatum 01.08.2024\nHosting Paket Business (Aug)              24,99 EUR\nNetto gesamt                              24,99 EUR\nMwSt (19%)                                 4,75 EUR\nGesamtsumme                               29,74 EUR\nDer Betrag wird per Lastschrift eingezogen.\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "RE-2024-5521",
+   "date": "2024-08-01",
+   "net": 2499,
+   "vat": 475,
+   "gross": 2974
+  }
+ },
+ "b2_english_gross_net": {
+  "text": "Seaside Linen Co.\nInvoice\nNumber: SL-2201\nIssue date: 2024-08-14\nTerms: due within 14 days\nNet:    800.00\nVAT 20%: 160.00\nGross:  960.00\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "SL-2201",
+   "date": "2024-08-14",
+   "due": "2024-08-28",
+   "net": 80000,
+   "vat": 16000,
+   "gross": 96000
+  }
+ },
+ "b2_rechnung_nr_inline_with_date": {
+  "text": "Weingut Rheintal\nRechnung Nr. 24-0815 vom 29.08.2024\nWein Riesling 12 Fl.      10,00      120,00\nWarenwert netto                      120,00\nMwSt 19 %                             22,80\nRechnungsbetrag                      142,80\nZahlbar bis 28.09.2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "24-0815",
+   "date": "2024-08-29",
+   "due": "2024-09-28",
+   "net": 12000,
+   "vat": 2280,
+   "gross": 14280
+  }
+ },
+ "b2_fr_total_ht_tva_ttc_multiline": {
+  "text": "Traiteur Lefèvre\nFACTURE N° 2024-0387\nDate: 02/09/2024\nDésignation                     Qté   PU HT    Total HT\nBuffet froid                     20   12,00    240,00\nTotal HT                                       240,00 €\nTVA 10%                                         24,00 €\nTotal TTC                                      264,00 €\nDate d'échéance: 02/10/2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-0387",
+   "date": "2024-09-02",
+   "due": "2024-10-02",
+   "net": 24000,
+   "vat": 2400,
+   "gross": 26400
+  }
+ },
+ "b2_it_totale_da_pagare": {
+  "text": "Forniture Alberghiere S.p.A.\nFATTURA N. 2024/0912\nData: 05/10/2024\nTotale imponibile      500,00\nIVA 22%                110,00\nTotale da pagare       610,00\nScadenza pagamento: 04/11/2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024/0912",
+   "date": "2024-10-05",
+   "due": "2024-11-04",
+   "net": 50000,
+   "vat": 11000,
+   "gross": 61000
+  }
+ },
+ "b2_de_nachlass_and_versand": {
+  "text": "Bettwäsche Express GmbH\nRechnung\nRechnungsnr.: BW-77120\nRechnungsdatum: 10.10.2024\nWarenwert                   400,00\nRabatt 10 %                 -40,00\nVersandkosten                 5,00\nNettosumme                  365,00\nMwSt 19 %                    69,35\nGesamtbetrag                434,35\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "BW-77120",
+   "date": "2024-10-10",
+   "net": 36500,
+   "vat": 6935,
+   "gross": 43435
+  }
+ },
+ "b2_amount_in_euro_words_label_order": {
+  "text": "Taxi Hotel Shuttle\nQuittung / Rechnung\nRechnungsnummer 2024-77\nDatum 17.10.2024\nBetrag brutto EUR 45,00\ndavon 19 % MwSt EUR 7,18\nBetrag netto EUR 37,82\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-77",
+   "date": "2024-10-17",
+   "net": 3782,
+   "vat": 718,
+   "gross": 4500
+  }
+ },
+ "b2_late_total_after_footer_noise": {
+  "text": "Elektrogroßhandel Böhm\nRechnung 118833\nRechnungsdatum 20.10.2024\nZwischensumme            1.250,00\nFracht                      25,00\nNetto                    1.275,00\nUSt 19%                    242,25\nSumme                    1.517,25\nSeite 1 von 1\nGeschäftsführer: Max Böhm · Sitz: Kassel · HRB 4711\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "118833",
+   "date": "2024-10-20",
+   "net": 127500,
+   "vat": 24225,
+   "gross": 151725
+  }
+ },
+ "b2_header_row_nr_datum": {
+  "text": "Schlüsseldienst Kraft\nRechnung\nRechnungs-Nr.   Datum        Fällig\n2024-2201       25.10.2024   08.11.2024\nNetto 80,00\nMwSt 19% 15,20\nBetrag 95,20\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-2201",
+   "date": "2024-10-25",
+   "due": "2024-11-08",
+   "net": 8000,
+   "vat": 1520,
+   "gross": 9520
+  }
+ },
+ "b2_ocr_spaces_in_amounts": {
+  "text": "Wäscherei Sauber\nRechnung Nr. WS-1190\nDatum: 03.11.2024\nNetto 1 250,00 €\nMwSt. 19 % 237,50 €\nBrutto 1 487,50 €\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "WS-1190",
+   "date": "2024-11-03",
+   "net": 125000,
+   "vat": 23750,
+   "gross": 148750
+  }
+ },
+ "b2_no_rate_just_vat_amount": {
+  "text": "Foto Studio Licht\nRechnung Nr. L-9\nDatum: 05.11.2024\nHonorar           300,00\nMehrwertsteuer     57,00\nGesamt            357,00\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "L-9",
+   "date": "2024-11-05",
+   "net": 30000,
+   "vat": 5700,
+   "gross": 35700
+  }
+ },
+ "b2_es_total_a_pagar": {
+  "text": "Hostelería Mediterránea S.L.\nFACTURA\nNúmero de factura: 2024-441\nFecha: 12/11/2024\nBase imponible 300,00\nIVA 21% 63,00\nTotal a pagar 363,00\nVencimiento 12/12/2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-441",
+   "date": "2024-11-12",
+   "due": "2024-12-12",
+   "net": 30000,
+   "vat": 6300,
+   "gross": 36300
+  }
+ },
+ "b2_nl_totaal_incl_btw": {
+  "text": "Groothandel De Vries\nFactuur\nFactuurnummer 24-1181\nDatum 14-11-2024\nTotaal excl. BTW   200,00\nBTW 21%             42,00\nTotaal incl. BTW   242,00\nBetaling binnen 30 dagen\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "24-1181",
+   "date": "2024-11-14",
+   "due": "2024-12-14",
+   "net": 20000,
+   "vat": 4200,
+   "gross": 24200
+  }
+ },
+ "b2_english_total_no_vat": {
+  "text": "Delta Courier Services\nInvoice\nInvoice #: D-5512\nDate: 20 November 2024\nDelivery fee 40.00\nTotal 40.00\nDue on receipt\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "D-5512",
+   "date": "2024-11-20",
+   "due": "2024-11-20",
+   "gross": 4000
+  }
+ },
+ "b2_de_endbetrag_zahlbar_in_tagen": {
+  "text": "Gebäudereinigung Klar\nRechnung Nr.: GK-2024-1120\nRechnungsdatum: 22.11.2024\nLeistungszeitraum: 01.11.2024 - 30.11.2024\nNetto: 890,00 EUR\nzzgl. 19 % MwSt.: 169,10 EUR\nEndbetrag: 1.059,10 EUR\nZahlbar innerhalb von 10 Tagen nach Rechnungserhalt.\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "GK-2024-1120",
+   "date": "2024-11-22",
+   "due": "2024-12-02",
+   "net": 89000,
+   "vat": 16910,
+   "gross": 105910
+  }
+ },
+ "b2_beleg_lieferant_title_only": {
+  "text": "Weinhandel Kellermann\nBELEG\nBelegnummer: B-2024-9001\nBelegdatum: 01.12.2024\nNetto 150,00\nUSt 19% 28,50\nBrutto 178,50\nFällig 15.12.2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "B-2024-9001",
+   "date": "2024-12-01",
+   "due": "2024-12-15",
+   "net": 15000,
+   "vat": 2850,
+   "gross": 17850
+  }
+ },
+ "b2_total_summary_three_in_row_with_euro": {
+  "text": "Büroservice Kern\nRechnung Nr. 99-1\nDatum: 02.12.2024\nGesamt:  100,00 €  19,00 €  119,00 €\nZahlungsziel 14 Tage\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "99-1",
+   "date": "2024-12-02",
+   "due": "2024-12-16",
+   "net": 10000,
+   "vat": 1900,
+   "gross": 11900
+  }
+ },
+ "b2_credit_note_gutschrift_vokabular": {
+  "text": "Büroservice Kern\nGUTSCHRIFT\nGutschrift-Nr. GS-10\nDatum: 05.12.2024\nGutschrift Netto 100,00 €\nMwSt 19 % 19,00 €\nGutschriftsbetrag 119,00 €\n",
+  "expected": {
+   "doc_type": "credit_note",
+   "number": "GS-10",
+   "date": "2024-12-05",
+   "net": 10000,
+   "vat": 1900,
+   "gross": 11900
+  }
+ },
+ "b2_mixed_rates_fr": {
+  "text": "Épicerie Fine Rousseau\nFACTURE 2024-0099\nDate 15/12/2024\nTotal HT 5,5%   100,00\nTotal HT 20%     50,00\nTVA 5,5%          5,50\nTVA 20%          10,00\nTotal TTC       165,50\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-0099",
+   "date": "2024-12-15",
+   "net": 15000,
+   "vat": 1550,
+   "gross": 16550
+  }
+ }
+}

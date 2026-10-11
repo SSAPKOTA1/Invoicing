@@ -1,0 +1,47 @@
+{
+ "info_block_totals_right": {
+  "doc_type": "invoice",
+  "number": "RE-2024-881",
+  "date": "2024-03-15",
+  "due": "2024-03-29",
+  "net": 64000,
+  "vat": 12160,
+  "gross": 76160
+ },
+ "beleg_horizontal_totals": {
+  "doc_type": "invoice",
+  "number": "2024-0815",
+  "date": "2024-03-15",
+  "due": "2024-03-29",
+  "net": 20000,
+  "vat": 3800,
+  "gross": 23800
+ },
+ "facture_fr": {
+  "doc_type": "invoice",
+  "number": "FA-2024-0042",
+  "date": "2024-03-15",
+  "due": "2024-04-14",
+  "net": 100000,
+  "vat": 20000,
+  "gross": 120000
+ },
+ "summe_total_only_gross": {
+  "doc_type": "invoice",
+  "number": "55-1021",
+  "date": "2024-04-02",
+  "due": "2024-05-02",
+  "net": 10000,
+  "vat": 1900,
+  "gross": 11900
+ },
+ "amounts_left_of_labels": {
+  "doc_type": "invoice",
+  "number": "INV-2024-17",
+  "date": "2024-03-12",
+  "due": "2024-04-11",
+  "net": 100000,
+  "vat": 19000,
+  "gross": 119000
+ }
+}

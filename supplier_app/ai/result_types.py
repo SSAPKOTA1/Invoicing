@@ -68,6 +68,7 @@ class ExtractedFields:
     vat_ids: list[FieldValue] = field(default_factory=list)
     vat_rate: FieldValue | None = None
     currency: FieldValue | None = None
+    derived: set[str] = field(default_factory=set)  # amount keys that were calculated, not read
 
     def amount(self, key: str) -> int | None:
         f = self.amounts.get(key)

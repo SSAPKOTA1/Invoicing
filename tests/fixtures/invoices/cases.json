@@ -1,0 +1,340 @@
+{
+ "de_beleg_netto_brutto": {
+  "text": "Elektro Meier e.K.\nHauptstr. 4 · 50667 Köln\n\nBeleg\nBeleg-Nr.: 2024-0815\nDatum: 15.03.2024\nKunde: Hotel Seeblick\n\nPos  Bezeichnung                Menge   Preis\n1    Installationsarbeiten        8 Std  80,00\nNetto                       640,00 EUR\nMwSt 19 %                   121,60 EUR\nBrutto                      761,60 EUR\nZahlbar innerhalb von 14 Tagen ohne Abzug.\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-0815",
+   "date": "2024-03-15",
+   "due": "2024-03-29",
+   "net": 64000,
+   "vat": 12160,
+   "gross": 76160
+  }
+ },
+ "de_summe_total_row": {
+  "text": "Bürobedarf Nord GmbH\nRechnung Nr. 55-1021\nRechnungsdatum 02.04.2024\nFällig am 02.05.2024\n\nArtikel                      Menge   Einzelpreis   Gesamt\nPapier A4                       10       4,00        40,00\nToner schwarz                    2      30,00        60,00\n\nSumme netto                100,00\nzzgl. 19% USt               19,00\nSumme                      119,00\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "55-1021",
+   "date": "2024-04-02",
+   "due": "2024-05-02",
+   "net": 10000,
+   "vat": 1900,
+   "gross": 11900
+  }
+ },
+ "de_table_header_values_below": {
+  "text": "Gärtnerei Grün OHG\nRechnung\nRechnungsnummer     Rechnungsdatum     Kundennummer\nR-2024-77           12.03.2024         K-1001\n\nNetto          MwSt 19%        Brutto\n200,00         38,00           238,00\n\nZahlungsziel: 30 Tage netto\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "R-2024-77",
+   "date": "2024-03-12",
+   "due": "2024-04-11",
+   "net": 20000,
+   "vat": 3800,
+   "gross": 23800
+  }
+ },
+ "de_summary_row_three_amounts": {
+  "text": "Druckerei Weiss GmbH\nRechnung Nr. DW-9981 vom 20.02.2024\n\nGesamt   100,00   19,00   119,00\n(Netto / MwSt / Brutto)\nZahlbar bis 05.03.2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "DW-9981",
+   "date": "2024-02-20",
+   "due": "2024-03-05",
+   "net": 10000,
+   "vat": 1900,
+   "gross": 11900
+  }
+ },
+ "de_endsumme_zu_zahlen": {
+  "text": "Reinigung Blitz GmbH\nRECHNUNG\nRechnungs-Nr. B/2024/310\nDatum: 01.06.2024\n\nLeistung: Unterhaltsreinigung Mai\nNettobetrag                     1.500,00 €\nUmsatzsteuer 19 %                 285,00 €\nEndsumme                        1.785,00 €\nZu zahlen bis 15.06.2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "B/2024/310",
+   "date": "2024-06-01",
+   "due": "2024-06-15",
+   "net": 150000,
+   "vat": 28500,
+   "gross": 178500
+  }
+ },
+ "de_two_vat_rates": {
+  "text": "Bäckerei Hoffmann e.K.\nRechnung 2024-0042\nRechnungsdatum: 31.05.2024\n\nBrötchen        7 %     50,00\nCatering       19 %    100,00\nNetto 7 %                50,00\nNetto 19 %              100,00\nMwSt 7 %                  3,50\nMwSt 19 %                19,00\nGesamtbetrag            172,50 €\nFälligkeit: 14.06.2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-0042",
+   "date": "2024-05-31",
+   "due": "2024-06-14",
+   "net": 15000,
+   "vat": 2250,
+   "gross": 17250
+  }
+ },
+ "de_brutto_only_inkl": {
+  "text": "Taxi Schmidt\nRechnung Nr. 7781\nDatum 08.07.2024\nFahrt Flughafen – Hotel\nGesamtbetrag inkl. 19 % MwSt.: 119,00 EUR\nSofort fällig.\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "7781",
+   "date": "2024-07-08",
+   "due": "2024-07-08",
+   "gross": 11900
+  }
+ },
+ "de_rechnungssumme_brutto_label": {
+  "text": "Hausmeisterservice Krause\nRg.-Nr.: 24-117\nRechnungsdatum: 03.08.2024\nBetrag netto:              420,00\n19 % MwSt:                  79,80\nBetrag brutto:             499,80\nZahlungsbedingungen: 14 Tage netto\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "24-117",
+   "date": "2024-08-03",
+   "due": "2024-08-17",
+   "net": 42000,
+   "vat": 7980,
+   "gross": 49980
+  }
+ },
+ "de_skonto": {
+  "text": "Getränke Handel Süd GmbH\nRechnung Nr. GH-5532\nRechnungsdatum: 10.09.2024\nWarenwert netto          200,00\n19 % MwSt                 38,00\nRechnungsbetrag          238,00\nBei Zahlung bis 20.09.2024 gewähren wir 2 % Skonto.\nZahlbar netto bis 10.10.2024.\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "GH-5532",
+   "date": "2024-09-10",
+   "due": "2024-10-10",
+   "net": 20000,
+   "vat": 3800,
+   "gross": 23800
+  }
+ },
+ "de_thousands_and_items_total_column": {
+  "text": "Möbel Contract AG\nRechnung\nRechnungsnummer: MC-2024-1204\nRechnungsdatum: 12.10.2024\n\nPos Artikel          Menge Einzelpreis Gesamt\n1   Tisch              10     250,00   2.500,00\n2   Stuhl              40      85,00   3.400,00\n\nZwischensumme (netto)        5.900,00\nMwSt. 19%                    1.121,00\nGesamtsumme                  7.021,00\nZahlbar bis 11.11.2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "MC-2024-1204",
+   "date": "2024-10-12",
+   "due": "2024-11-11",
+   "net": 590000,
+   "vat": 112100,
+   "gross": 702100
+  }
+ },
+ "de_faktura": {
+  "text": "Maschinenbau Schulz GmbH\nFAKTURA\nFaktura-Nr. 120934\nFakturadatum 04.11.2024\nNetto 1.000,00\nUSt 19% 190,00\nTotal 1.190,00\nZahlungsziel 30 Tage\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "120934",
+   "date": "2024-11-04",
+   "due": "2024-12-04",
+   "net": 100000,
+   "vat": 19000,
+   "gross": 119000
+  }
+ },
+ "de_honorarnote_dokument_nr": {
+  "text": "Steuerberatung Wagner\nHonorarnote\nDokumentnummer: HN-2024-09\nDatum: 02.12.2024\nBeratungshonorar netto      800,00\nUmsatzsteuer 19 %           152,00\nHonorar gesamt              952,00\nZahlbar innerhalb 10 Tagen.\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "HN-2024-09",
+   "date": "2024-12-02",
+   "due": "2024-12-12",
+   "net": 80000,
+   "vat": 15200,
+   "gross": 95200
+  }
+ },
+ "de_rechnungskopie_belegnummer": {
+  "text": "Telekom Service GmbH\nRechnung\nBelegnummer 9981234501\nBelegdatum 15.01.2025\nEntgelte netto            84,03\nUmsatzsteuer 19 %         15,97\nRechnungsbetrag          100,00 EUR\nFällig am 29.01.2025\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "9981234501",
+   "date": "2025-01-15",
+   "due": "2025-01-29",
+   "net": 8403,
+   "vat": 1597,
+   "gross": 10000
+  }
+ },
+ "de_date_formats_short_year": {
+  "text": "Autohaus Lang\nRechnung Nr. 1234\nDatum: 5.3.25\nReparatur\nNetto: 100,00\nMwSt: 19,00\nBrutto: 119,00\nFällig: 19.3.25\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "1234",
+   "date": "2025-03-05",
+   "due": "2025-03-19",
+   "net": 10000,
+   "vat": 1900,
+   "gross": 11900
+  }
+ },
+ "fr_facture": {
+  "text": "Maison Dupont SARL\n12 rue de la Paix, 75002 Paris\nFACTURE\nFacture n° FA-2024-0042\nDate de facture : 15/03/2024\nDate d'échéance : 14/04/2024\nMontant HT          1 000,00 €\nTVA 20 %              200,00 €\nTotal TTC           1 200,00 €\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "FA-2024-0042",
+   "date": "2024-03-15",
+   "due": "2024-04-14",
+   "net": 100000,
+   "vat": 20000,
+   "gross": 120000
+  }
+ },
+ "fr_facture_net_a_payer": {
+  "text": "Boulangerie Martin\nFacture N° 2024-117\nDate : 02/05/2024\nTotal HT : 50,00\nTVA 5,5 % : 2,75\nNet à payer : 52,75 EUR\nPaiement à 30 jours\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-117",
+   "date": "2024-05-02",
+   "due": "2024-06-01",
+   "net": 5000,
+   "vat": 275,
+   "gross": 5275
+  }
+ },
+ "it_fattura": {
+  "text": "Ristorante Da Mario S.r.l.\nFattura\nFattura n. 2024/118\nData fattura: 10/06/2024\nImponibile             100,00\nIVA 22%                 22,00\nTotale documento       122,00\nScadenza: 10/07/2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024/118",
+   "date": "2024-06-10",
+   "due": "2024-07-10",
+   "net": 10000,
+   "vat": 2200,
+   "gross": 12200
+  }
+ },
+ "es_factura": {
+  "text": "Suministros Ibéricos S.L.\nFactura\nFactura nº F-2024-310\nFecha de factura: 03/09/2024\nBase imponible        200,00\nIVA 21%                42,00\nTotal factura         242,00\nFecha de vencimiento: 03/10/2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "F-2024-310",
+   "date": "2024-09-03",
+   "due": "2024-10-03",
+   "net": 20000,
+   "vat": 4200,
+   "gross": 24200
+  }
+ },
+ "nl_factuur": {
+  "text": "Bloemen Jansen B.V.\nFactuur\nFactuurnummer: 2024-0099\nFactuurdatum: 12-04-2024\nVervaldatum: 12-05-2024\nSubtotaal           100,00\nBTW 21%              21,00\nTotaal              121,00\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-0099",
+   "date": "2024-04-12",
+   "due": "2024-05-12",
+   "net": 10000,
+   "vat": 2100,
+   "gross": 12100
+  }
+ },
+ "en_tax_invoice_us_format": {
+  "text": "Northwind Trading Ltd\nTAX INVOICE\nInvoice # 10045\nInvoice Date: 03/15/2024\nPayment terms: Net 30\nSubtotal       1,000.00\nVAT 20%          200.00\nTotal          1,200.00 GBP\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "10045",
+   "date": "2024-03-15",
+   "due": "2024-04-14",
+   "net": 100000,
+   "vat": 20000,
+   "gross": 120000
+  }
+ },
+ "en_long_date_amount_payable": {
+  "text": "Harbour Supplies Ltd\nInvoice\nInvoice number: HS-7788\nDate: 15 March 2024\nDue date: April 14, 2024\nNet total      250.00\nVAT 20%         50.00\nAmount payable 300.00\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "HS-7788",
+   "date": "2024-03-15",
+   "due": "2024-04-14",
+   "net": 25000,
+   "vat": 5000,
+   "gross": 30000
+  }
+ },
+ "de_swiss_apostrophe": {
+  "text": "Hotelbedarf Zürich AG\nRechnung Nr. 2024-310\nDatum: 12.03.2024\nTotal netto           1'000.00\nMwSt 8.1 %               81.00\nTotal brutto          1'081.00\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-310",
+   "date": "2024-03-12",
+   "net": 100000,
+   "vat": 8100,
+   "gross": 108100
+  }
+ },
+ "de_space_thousands": {
+  "text": "Bau & Montage GmbH\nRechnung Nr. BM-2024-44\nRechnungsdatum: 12.03.2024\nNettobetrag            12 500,00 €\n19 % Umsatzsteuer       2 375,00 €\nGesamtbetrag           14 875,00 €\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "BM-2024-44",
+   "date": "2024-03-12",
+   "net": 1250000,
+   "vat": 237500,
+   "gross": 1487500
+  }
+ },
+ "de_ocr_noise": {
+  "text": "Elektro Meier e.K.\nRechnu ng\nRechnungs nummer: RE-2024-881\nRechnungsdatum: 15.03 .2024\nNettobetrag: 1.000,00 €\n19 % MwSt.: 190,00 €\nRechnungs betrag: 1.190,00 €\nZahlbar bis: 29.03.2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "RE-2024-881",
+   "date": "2024-03-15",
+   "due": "2024-03-29",
+   "net": 100000,
+   "vat": 19000,
+   "gross": 119000
+  }
+ },
+ "de_gross_before_net_order": {
+  "text": "Dachdecker Braun\nRechnung 24/088\nDatum 14.03.2024\nRechnungsbetrag brutto 595,00 €\ndarin enthalten 19 % MwSt 95,00 €\nNettobetrag 500,00 €\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "24/088",
+   "date": "2024-03-14",
+   "net": 50000,
+   "vat": 9500,
+   "gross": 59500
+  }
+ },
+ "de_no_labels_only_numbers": {
+  "text": "Schreinerei Lutz\nRechnung Nr. 301\nDatum 14.03.2024\nRegal Eiche massiv            1      420,17\nNetto                                420,17\n19%                                   79,83\nSumme                                500,00\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "301",
+   "date": "2024-03-14",
+   "net": 42017,
+   "vat": 7983,
+   "gross": 50000
+  }
+ },
+ "de_proforma_abrechnung": {
+  "text": "Agentur Kreativ GmbH\nAbrechnung\nAbrechnungsnummer AB-2024-12\nDatum 01.04.2024\nHonorar 1.000,00\nzzgl. MwSt. 19 % 190,00\nGesamt 1.190,00\nZahlbar bis 15.04.2024\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "AB-2024-12",
+   "date": "2024-04-01",
+   "due": "2024-04-15",
+   "net": 100000,
+   "vat": 19000,
+   "gross": 119000
+  }
+ },
+ "de_nachrechnung_nr_label_in_table_header": {
+  "text": "Fliesen Fischer\nRechnung\nNr.          Datum         Kunde\n2024-1555    22.04.2024    4711\nLeistung: Badsanierung\nNettobetrag  3.000,00 €\nMwSt 19 %      570,00 €\nGesamtbetrag 3.570,00 €\n",
+  "expected": {
+   "doc_type": "invoice",
+   "number": "2024-1555",
+   "date": "2024-04-22",
+   "net": 300000,
+   "vat": 57000,
+   "gross": 357000
+  }
+ },
+ "de_credit_note_gutschrift": {
+  "text": "Elektro Meier e.K.\nGutschrift\nGutschriftsnummer: GS-2024-12\nDatum: 20.03.2024\nzu Rechnung RE-2024-881\nNettobetrag -100,00 €\nMwSt 19 % -19,00 €\nGutschriftsbetrag -119,00 €\n",
+  "expected": {
+   "doc_type": "credit_note",
+   "number": "GS-2024-12",
+   "date": "2024-03-20",
+   "gross": 11900
+  }
+ }
+}

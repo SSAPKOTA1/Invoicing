@@ -75,6 +75,11 @@ Unter *Einstellungen → Pfade* öffnet ein Klick den Datenordner.
 
 Beim Import steht im Prüfformular das Feld **Fälligkeitsdatum** (mit Schaltflächen +14 / +30 / +60 Tage). Wird keins erkannt, wird *Rechnungsdatum + Zahlungsziel* vorgeschlagen und als unsicher markiert. Später änderbar im Vorgang: **Fälligkeit ändern …** (Rechnung) und **Frist ändern …** (markierte Mahnung); jede Änderung wird protokolliert.
 
+### Erkennung von Rechnungen
+
+Die Erkennung kennt Rechnungen auf Deutsch, Englisch, Französisch, Italienisch, Spanisch und Niederländisch: Überschriften wie *Rechnung, Beleg, Faktura, Honorarnote, Abrechnung, Invoice, Tax invoice, Facture, Fattura, Factura, Factuur*; Beträge als *Netto / Brutto / MwSt*, *Summe, Gesamt, Total, Gesamtbetrag, Endsumme, Zu zahlen, Rechnungsbetrag*, *Montant HT / Total TTC / TVA*, *Imponibile / IVA / Totale*, *Base imponible / Total factura*, *Subtotaal / BTW / Totaal*; Zahlen in Tabellen (Spalten „Netto – MwSt – Brutto“, Summenzeile „Gesamt 100,00 19,00 119,00“), mehrere Steuersätze, Zahlformate wie `1.234,56`, `1 234,56`, `1'234.56`, `1,234.56`; Daten wie `15.03.2024`, `15/03/24`, `15 March 2024`, `15 mars 2024`; Zahlungsziele wie *30 Tage netto*, *Net 30*, *Zahlbar bis …*, *sofort fällig* (Skonto-Daten werden nicht als Fälligkeit gelesen).
+Netto, MwSt und Brutto werden gegeneinander geprüft (Netto + MwSt = Brutto). Fehlt ein Wert, wird er berechnet und im Prüfformular als „berechnet“ markiert. Eigene Begriffe für einzelne Lieferanten tragen Sie unter **Einstellungen → Erkennung: eigene Begriffe** ein.
+
 ### Berichte drucken
 
 Berichte → **Druckvorschau …** / **Drucken …**: A4 mit Kopfzeile (Titel, Filter, Gesellschaft/Hotel), wiederholter Tabellenkopf auf jeder Seite und „Seite x von y“. Breite Tabellen werden quer gedruckt (in der Vorschau/im Druckdialog änderbar). Über einen PDF-Drucker lässt sich auch eine PDF-Datei erzeugen.

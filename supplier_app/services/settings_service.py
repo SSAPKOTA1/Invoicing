@@ -37,6 +37,7 @@ DEFAULTS: dict[str, str] = {
     "idle_lock_minutes": "10",
     "low_confidence": "0.75",
     "reference_rules": "",
+    "custom_vocab": "",
     "active_scope": "",
 }
 
@@ -124,6 +125,20 @@ class SettingsService(ServiceBase):
 
     def set_reference_rules(self, rules: dict[str, list[str]]) -> None:
         self.set("reference_rules", json.dumps(rules, ensure_ascii=False))
+
+    def custom_vocab(self) -> dict[str, list[str]]:
+        """User-defined extra recognition words (Gesamt-/Netto-/MwSt-Begriffe, Rechnungsnummer, Datum ...)."""
+        raw = self.get("custom_vocab")
+        if not raw:
+            return {}
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return {}
+        return {str(k): [str(x) for x in v] for k, v in data.items() if isinstance(v, list)}
+
+    def set_custom_vocab(self, vocab: dict[str, list[str]]) -> None:
+        self.set("custom_vocab", json.dumps({k: v for k, v in vocab.items() if v}, ensure_ascii=False))
 
     def set_rate(self, valid_from: date, base_rate: Decimal) -> None:
         self.repos.rates.upsert(InterestRate(valid_from, base_rate))

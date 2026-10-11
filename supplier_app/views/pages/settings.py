@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from supplier_app.ai.vocab import EXTRA_VOCAB_KEYS
 from supplier_app.controllers.app_controller import AppController
 from supplier_app.errors import SupplierAppError
 from supplier_app.i18n import tr
@@ -49,7 +50,7 @@ class SettingsPage(Page):
         root.setSpacing(14)
         root.addWidget(page_title(tr("nav.settings")))
         for builder in (self._appearance, self._organization, self._security, self._paths, self._tesseract, self._interest, self._allocation,
-                        self._references, self._backup, self._demo):
+                        self._references, self._vocabulary, self._backup, self._demo):
             root.addWidget(builder())
         root.addStretch(1)
 
@@ -185,6 +186,20 @@ class SettingsPage(Page):
         card.add(button(tr("common.save"), "primary", self._save_refs))
         return card
 
+    def _vocabulary(self) -> Card:
+        card = Card(tr("settings.vocab"))
+        card.add(muted(tr("settings.vocab.hint")))
+        self.vocab_edits: dict[str, QLineEdit] = {}
+        form = QFormLayout()
+        for key in EXTRA_VOCAB_KEYS:
+            edit = QLineEdit()
+            edit.setPlaceholderText(tr("settings.references.placeholder"))
+            self.vocab_edits[key] = edit
+            form.addRow(tr(f"settings.vocab.{key}"), edit)
+        card.layout_.addLayout(form)
+        card.add(button(tr("common.save"), "primary", self._save_vocab))
+        return card
+
     def _backup(self) -> Card:
         card = Card(tr("settings.backup"))
         row = QHBoxLayout()
@@ -227,6 +242,9 @@ class SettingsPage(Page):
         rules = s.reference_rules()
         for t, edit in self.ref_edits.items():
             edit.setText(", ".join(rules.get(t.value, [])))
+        vocab = s.custom_vocab()
+        for key, edit in self.vocab_edits.items():
+            edit.setText(", ".join(vocab.get(key, [])))
         self._fill_rates()
         self._fill_organization()
         if not self.tess_info.text():
@@ -361,6 +379,11 @@ class SettingsPage(Page):
             self.svc.repos.rates.delete(valid_from)
             self._fill_rates()
             self.ctrl.notify_changed()
+
+    def _save_vocab(self) -> None:
+        vocab = {k: [w.strip() for w in e.text().split(",") if w.strip()] for k, e in self.vocab_edits.items()}
+        self.svc.settings.set_custom_vocab(vocab)
+        self.ctrl.status.emit(tr("settings.saved"))
 
     def _save_refs(self) -> None:
         rules = {t.value: [w.strip() for w in e.text().split(",") if w.strip()] for t, e in self.ref_edits.items()}

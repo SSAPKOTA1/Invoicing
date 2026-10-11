@@ -63,3 +63,4 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 - 2026-10-09 Phase 5: report builders, CSV/Excel/PDF exporters, dashboard PNG/PDF export; tests prove exported numbers == ledger
 - 2026-10-09 Phase 6: pinned requirements (fresh venv ok), PyInstaller spec (built+selfcheck on Linux), build_exe.ps1, ci.yml/release.yml, README, VERIFICATION; CI run on dbcea07 green incl. exe build + exe selfcheck
 - 2026-10-11 Phase 7 (change request): companies/hotels with global scope filter in every layer, due-date entry/editing, report printing; migration 004, 191 tests, ruff + selfcheck green
+- 2026-10-11 Phase 8 (change request): invoice recognition vocabulary (DE/EN/FR/IT/ES/NL), net/vat/gross cross-check, table/PDF layouts, own vocabulary in Settings
