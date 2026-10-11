@@ -193,6 +193,7 @@ def test_connection_dialog_and_start_flow(pg_dsn, tmp_path, monkeypatch) -> None
     dlg.port.setValue(cfg.port)
     dlg.dbname.setText(cfg.dbname)
     dlg.user.setText(cfg.user)
+    dlg.password.setText(parts.get("password", ""))  # the CI server requires a password, the local one does not
     dlg.test()
     assert not dlg.info.isHidden() and "PostgreSQL" in dlg.info.text()
     dlg.port.setValue(1)  # nothing listens there
