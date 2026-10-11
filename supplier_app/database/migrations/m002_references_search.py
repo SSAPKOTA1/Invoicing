@@ -21,8 +21,9 @@ STATEMENTS = [
     """CREATE INDEX ix_refs_norm ON document_references(normalized_value)""",
     """CREATE INDEX ix_refs_owner ON document_references(owner_kind, owner_id)""",
     """CREATE FUNCTION fts_norm(t text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
-SELECT translate(regexp_replace(lower(coalesce(t, '')), '[^[:alnum:]]+', ' ', 'g'),
-                 'äöüéèêëàáâíìîïóòôúùûçñ', 'aoueeeeaaaiiiiooouuucn')
+SELECT regexp_replace(lower(translate(coalesce(t, ''),
+                 'ÄÖÜÉÈÊËÀÁÂÍÌÎÏÓÒÔÚÙÛÇÑäöüéèêëàáâíìîïóòôúùûçñ', 'AOUEEEEAAAIIIIOOOUUUCNaoueeeeaaaiiiiooouuucn')),
+                 '[^[:alnum:]]+', ' ', 'g')
 $$""",
     """CREATE INDEX ix_documents_fts ON documents USING GIN (to_tsvector('simple', fts_norm(coalesce(original_name, '') || ' ' || coalesce(ocr_text, ''))))""",
 ]

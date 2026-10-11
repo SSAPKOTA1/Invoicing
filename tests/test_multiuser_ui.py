@@ -206,6 +206,7 @@ def test_connection_dialog_and_start_flow(pg_dsn, tmp_path, monkeypatch) -> None
     assert dlg.result_config is not None and dlg.result_config.is_configured
 
     # start flow: unreachable server -> connection dialog; cancelling ends the start
+    monkeypatch.delenv("SUPPLIERAPP_PG_DSN", raising=False)  # CI sets it for the program itself
     paths = AppPaths(tmp_path / "pc").ensure()
     ConnectionConfig(host="127.0.0.1", port=1, user="x", dbname="y").save(paths.root)
     seen = []
