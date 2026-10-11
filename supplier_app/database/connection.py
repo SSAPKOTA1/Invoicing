@@ -26,7 +26,13 @@ class Database:
 
     backend = "sqlite"
 
-    def __init__(self, path: Path | str, *, timeout: float = 5.0) -> None:
+    def __init__(self, path: Path | str, *, timeout: float = 5.0, shared: bool = False) -> None:
+        """``shared``: the file lives in a shared folder used by several PCs at the same time. Then the classic rollback
+        journal is used (WAL does not work over network file systems), writes are flushed completely, and the lock wait is
+        long enough for a colleague's booking to finish."""
+        self.shared = shared
+        if shared:
+            timeout = max(timeout, 30.0)
         self.path = str(path)
         self.read_only = False
         self.user_name = ""  # who is logged in (multi-user mode); written to the audit log
@@ -44,7 +50,11 @@ class Database:
             conn = sqlite3.connect(self.path, timeout=self._timeout, isolation_level=None)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA foreign_keys = ON")
-            if self.path != ":memory:":
+            if self.shared:
+                conn.execute(f"PRAGMA busy_timeout = {int(self._timeout * 1000)}")
+                conn.execute("PRAGMA journal_mode = DELETE")
+                conn.execute("PRAGMA synchronous = FULL")
+            elif self.path != ":memory:":
                 conn.execute("PRAGMA journal_mode = WAL")
                 conn.execute("PRAGMA synchronous = NORMAL")
             conn.execute(f"PRAGMA busy_timeout = {int(self._timeout * 1000)}")
@@ -114,8 +124,8 @@ class Database:
         text = str(exc).lower()
         if "locked" in text or "busy" in text:
             return DatabaseError(
-                "Die Datenbank ist gerade gesperrt.",
-                hint="Schließen Sie andere Instanzen der Anwendung und versuchen Sie es erneut.",
+                "Die Datenbank ist gerade durch einen anderen Benutzer belegt.",
+                hint="Bitte versuchen Sie es in wenigen Sekunden erneut.",
             )
         if "disk" in text and "full" in text or "readonly" in text:
             return DatabaseError(
@@ -140,6 +150,8 @@ class Database:
                 conn.execute("ROLLBACK")
                 raise
             else:
+                if self.shared and not self.read_only:
+                    self._note_change(conn)
                 conn.execute("COMMIT")
             finally:
                 self._depth = 0
@@ -157,6 +169,13 @@ class Database:
                 conn.execute(f"RELEASE {name}")
             finally:
                 self._depth -= 1
+
+    def _note_change(self, conn: sqlite3.Connection) -> None:
+        """Shared folder: remember who changed the data last (colleagues refresh and see the name)."""
+        try:
+            conn.execute("UPDATE data_version SET version = version + 1, changed_by = ? WHERE id = 1", (self.user_name,))
+        except sqlite3.Error:  # an old schema without the table must not break a booking
+            pass
 
     @property
     def in_transaction(self) -> bool:
@@ -176,3 +195,9 @@ class Database:
     def data_version(self) -> int:
         """Changes when another connection modified the file (live refresh of several windows)."""
         return int(self.scalar("PRAGMA data_version", default=0))
+
+    def data_changed_by(self) -> str:
+        try:
+            return str(self.scalar("SELECT changed_by FROM data_version WHERE id=1", default=""))
+        except DatabaseError:
+            return ""

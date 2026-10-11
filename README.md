@@ -84,7 +84,16 @@ Netto, MwSt und Brutto werden gegeneinander geprüft (Netto + MwSt = Brutto). Fe
 
 Berichte → **Druckvorschau …** / **Drucken …**: A4 mit Kopfzeile (Titel, Filter, Gesellschaft/Hotel), wiederholter Tabellenkopf auf jeder Seite und „Seite x von y“. Breite Tabellen werden quer gedruckt (in der Vorschau/im Druckdialog änderbar). Über einen PDF-Drucker lässt sich auch eine PDF-Datei erzeugen.
 
-### Mehrbenutzer-Betrieb (mehrere Personen gleichzeitig)
+### Mehrbenutzer ohne Server: gemeinsamer Ordner
+
+Für kleine Teams (2–5 Personen) ohne eigenen Server: Alle PCs verwenden **denselben Ordner im Netzwerk** (Freigabe eines immer eingeschalteten Windows-PCs oder NAS, z. B. `\\BUERO-PC\Lieferantenkonto`). Die Programmdateien können dort ebenfalls liegen oder auf jedem PC einzeln.
+
+* Einrichten: auf dem PC mit den bisherigen Daten *Einstellungen → Datenbank / Mehrbenutzer → Daten in einen gemeinsamen Ordner übertragen …* (Ordner muss leer sein, lokale Daten bleiben als Kopie). Auf den anderen PCs: *Verbindung ändern → Mehrbenutzer – gemeinsamer Ordner*. Beim ersten Start den Administrator anlegen; er legt die Kollegen an (Rollen wie im Server-Betrieb).
+* Alle Benutzer arbeiten gleichzeitig; Buchungen werden nacheinander verarbeitet (nie zwei Zahlungen auf dieselbe Rechnung, nie doppelte Rechnungsnummern – auch bei gleichzeitigem Klick), Änderungen der Kollegen erscheinen nach wenigen Sekunden, in den Einstellungen sehen Sie, wer gerade verbunden ist.
+* Sicherheitsnetz: Die Datenbank wird bei jedem Start geprüft und **täglich automatisch** in `backups\auto` im gemeinsamen Ordner kopiert (die letzten 14 Tage); eine beschädigte Datenbank wird gemeldet statt benutzt. Eine Sicherung zurückspielen geht nur, wenn kein anderer Benutzer verbunden ist.
+* **Einschränkungen (bitte lesen):** SQLite ist für Netzlaufwerke nicht gebaut. Es funktioniert zuverlässig nur mit normalen **Windows-Netzwerkfreigaben (SMB)** in einem stabilen Kabel-/WLAN-Netz. **Nicht** verwenden: OneDrive/Dropbox/Google Drive-Ordner (die App lehnt sie ab), NFS, Freigaben über VPN/langsame Leitungen. Bricht die Verbindung während einer Buchung ab, kann die Datenbank im schlimmsten Fall beschädigt werden – dann die letzte Tagessicherung zurückholen. Ab etwa 5 gleichzeitigen Benutzern oder bei Zweifeln den Server-Betrieb (PostgreSQL) wählen.
+
+### Mehrbenutzer-Betrieb mit Server (mehrere Personen gleichzeitig)
 
 Die Daten liegen dann **nicht** in einer Datei auf einem PC oder Netzlaufwerk (SQLite ist dafür nicht geeignet), sondern auf einem **PostgreSQL-Server** im Firmennetz. Jeder Benutzer startet die App auf seinem eigenen PC und meldet sich mit eigenem Namen und Passwort an. Änderungen von Kollegen erscheinen nach wenigen Sekunden automatisch; gleichzeitige Buchungen werden sicher nacheinander verarbeitet (keine doppelten Zahlungen, keine doppelten Rechnungsnummern).
 

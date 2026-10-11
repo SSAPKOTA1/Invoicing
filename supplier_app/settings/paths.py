@@ -13,7 +13,15 @@ from supplier_app import APP_NAME
 
 @dataclass(frozen=True)
 class AppPaths:
+    """``root`` holds the data (database, documents, backups). In the shared-folder mode it is the shared folder and
+    ``local_root`` keeps everything that belongs to this PC (logs, exports, connection settings, preferences)."""
+
     root: Path
+    local_root: Path | None = None
+
+    @property
+    def local(self) -> Path:
+        return self.local_root or self.root
 
     @property
     def database(self) -> Path:
@@ -29,14 +37,14 @@ class AppPaths:
 
     @property
     def logs(self) -> Path:
-        return self.root / "logs"
+        return self.local / "logs"
 
     @property
     def exports(self) -> Path:
-        return self.root / "exports"
+        return self.local / "exports"
 
     def ensure(self) -> AppPaths:
-        for p in (self.root, self.documents, self.backups, self.logs, self.exports):
+        for p in (self.root, self.local, self.documents, self.backups, self.logs, self.exports):
             p.mkdir(parents=True, exist_ok=True)
         return self
 

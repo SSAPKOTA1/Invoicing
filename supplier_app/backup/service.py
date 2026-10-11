@@ -8,6 +8,7 @@ import shutil
 import sqlite3
 import tempfile
 import zipfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -46,6 +47,8 @@ class BackupService:
     def __init__(self, db: Database, paths: AppPaths) -> None:
         self.db = db
         self.paths = paths
+        #: shared folder mode: returns the colleagues who are connected right now (restoring needs an empty list)
+        self.guard: Callable[[], list[str]] | None = None
 
     # -- backup ----------------------------------------------------------------
     @property
@@ -185,6 +188,10 @@ class BackupService:
         """Replace the current data with the backup; the old state is kept as a safety backup."""
         zip_path = Path(zip_path)
         manifest = self.verify_backup(zip_path)
+        others = self.guard() if self.guard else []
+        if others:
+            raise BackupError("Die Wiederherstellung ist nicht möglich, solange andere Benutzer angemeldet sind: "
+                              + ", ".join(others) + ". Bitte alle anderen bitten, das Programm zu schließen.")
         if self.server_mode:
             if manifest.get("format") != TABLE_FORMAT:
                 raise BackupError("Diese Sicherung stammt aus dem Einzelplatz-Modus und kann nicht in den Server eingespielt werden.")

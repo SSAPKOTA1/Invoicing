@@ -51,6 +51,7 @@ class AppController(QObject):
         self._idle.timeout.connect(self._idle_timeout)
         app.installEventFilter(self)
         self._last_version: int | None = None
+        self._polls = 0
         self._poll = QTimer(self)
         self._poll.timeout.connect(self.poll_changes)
 
@@ -68,6 +69,12 @@ class AppController(QObject):
         if self.multi_user:
             self._last_version = self._read_version()
             self._poll.start(interval_ms)
+            self.register_session()
+
+    def register_session(self) -> None:
+        """Shared folder mode: tell the colleagues who is connected (heartbeat file in the shared folder)."""
+        if self.ctx.registry is not None:
+            self.ctx.registry.register(self.ctx.services.session.username)
 
     def _read_version(self) -> int | None:
         try:
@@ -78,6 +85,9 @@ class AppController(QObject):
 
     def poll_changes(self) -> bool:
         """Refresh all screens when someone else changed the data. Returns True when a refresh happened."""
+        self._polls += 1
+        if self.ctx.registry is not None and self._polls % 10 == 0:
+            self.ctx.registry.heartbeat()
         version = self._read_version()
         if version is None or version == self._last_version:
             return False
@@ -96,6 +106,8 @@ class AppController(QObject):
         """Detach from the application (tests and clean exit)."""
         self._idle.stop()
         self._poll.stop()
+        if self.ctx.registry is not None:
+            self.ctx.registry.unregister()
         self.app.removeEventFilter(self)
 
     # -- theme -----------------------------------------------------------------------------

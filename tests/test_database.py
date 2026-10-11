@@ -66,7 +66,7 @@ def test_locked_database_gives_friendly_error(tmp_path) -> None:
         a.execute("INSERT INTO t VALUES (1)")
         with pytest.raises(DatabaseError) as err, b.transaction():
             pass
-        assert "gesperrt" in str(err.value)
+        assert "belegt" in str(err.value)
     a.close()
     b.close()
 

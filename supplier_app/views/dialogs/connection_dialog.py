@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
-from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QLabel, QLineEdit, QRadioButton, QSpinBox, QWidget
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QRadioButton,
+    QSpinBox,
+    QWidget,
+)
 
 from supplier_app.errors import SupplierAppError
 from supplier_app.i18n import tr
-from supplier_app.settings.connection import MODE_LOCAL, MODE_SERVER, ConnectionConfig, test_connection
+from supplier_app.settings.connection import MODE_LOCAL, MODE_SERVER, MODE_SHARED, ConnectionConfig, test_connection
 from supplier_app.views.dialogs.forms import button_box, dialog_root, form_layout, message_label
 from supplier_app.views.widgets.common import button
 
@@ -28,7 +39,20 @@ class ConnectionDialog(QDialog):
         root.addWidget(intro)
         self.local = QRadioButton(tr("conn.local"))
         self.server = QRadioButton(tr("conn.server"))
+        self.shared = QRadioButton(tr("conn.shared"))
         root.addWidget(self.local)
+        root.addWidget(self.shared)
+        shared_row = QHBoxLayout()
+        self.shared_path = QLineEdit(config.shared_path)
+        self.shared_path.setPlaceholderText(tr("conn.shared.placeholder"))
+        self.shared_browse = button(tr("common.browse"), "", self._browse)
+        shared_row.addWidget(self.shared_path, 1)
+        shared_row.addWidget(self.shared_browse)
+        root.addLayout(shared_row)
+        self.shared_hint = QLabel(tr("conn.shared.hint"))
+        self.shared_hint.setObjectName("Muted")
+        self.shared_hint.setWordWrap(True)
+        root.addWidget(self.shared_hint)
         root.addWidget(self.server)
         form = form_layout()
         self.host = QLineEdit(config.host)
@@ -62,8 +86,9 @@ class ConnectionDialog(QDialog):
         self.error = message_label(danger=True)
         root.addWidget(self.error)
         root.addWidget(button_box(self, tr("conn.save")))
-        (self.server if config.is_server else self.local).setChecked(True)
+        (self.server if config.is_server else self.shared if config.is_shared else self.local).setChecked(True)
         self.local.toggled.connect(self._sync)
+        self.shared.toggled.connect(self._sync)
         self._sync()
         if error:
             self.error.setText(error)
@@ -71,12 +96,21 @@ class ConnectionDialog(QDialog):
 
     def _sync(self) -> None:
         on = self.server.isChecked()
-        for w in (*self.fields, self.test_btn):
+        for w in (*self.fields,):
             w.setEnabled(on)
+        for w in (self.shared_path, self.shared_browse):
+            w.setEnabled(self.shared.isChecked())
+        self.test_btn.setEnabled(on or self.shared.isChecked())
+
+    def _browse(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, tr("conn.shared"), self.shared_path.text())
+        if folder:
+            self.shared_path.setText(folder)
 
     def _collect(self) -> ConnectionConfig:
         return ConnectionConfig(
-            mode=MODE_SERVER if self.server.isChecked() else MODE_LOCAL, host=self.host.text().strip(), port=self.port.value(),
+            mode=MODE_SERVER if self.server.isChecked() else MODE_SHARED if self.shared.isChecked() else MODE_LOCAL,
+            shared_path=self.shared_path.text().strip(), host=self.host.text().strip(), port=self.port.value(),
             dbname=self.dbname.text().strip(), user=self.user.text().strip(), password=self.password.text(),
             sslmode=str(self.ssl.currentData()))
 

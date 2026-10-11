@@ -46,7 +46,8 @@ class Services:
     session: Session
 
 
-def build_services(storage: Storage, *, multi_user: bool = False, prefs: LocalPrefs | None = None) -> Services:
+def build_services(storage: Storage, *, multi_user: bool = False, prefs: LocalPrefs | None = None,
+                   files_in_database: bool | None = None) -> Services:
     repos = storage.repos
     settings = SettingsService(repos, prefs if multi_user else None)
     settings.ensure_defaults()
@@ -57,7 +58,9 @@ def build_services(storage: Storage, *, multi_user: bool = False, prefs: LocalPr
     invoices = InvoiceService(repos, ledger, cases, settings)
     payments = PaymentService(repos, ledger, cases, settings)
     dunning = DunningService(repos, ledger, cases, settings)
-    documents = DocumentService(repos, storage.paths, files_in_database=multi_user)
+    if files_in_database is None:
+        files_in_database = multi_user and storage.db.backend == "postgres"  # shared folder mode keeps the files in the folder
+    documents = DocumentService(repos, storage.paths, files_in_database=files_in_database)
     ingest = IngestService(repos, documents, make_text_extractor(settings), settings, ledger, suppliers, invoices,
                            payments, dunning)
     return Services(

@@ -531,5 +531,13 @@
  "settings.account": "Mein Konto",
  "settings.account.info": "Angemeldet als <b>{name}</b> ({role}).",
  "settings.users": "Benutzer",
- "settings.users.hint": "Nur Administratoren sehen diese Liste. Gesperrte Benutzer können sich nicht anmelden; Benutzer werden nie gelöscht, wenn sie der letzte Administrator sind."
+ "settings.users.hint": "Nur Administratoren sehen diese Liste. Gesperrte Benutzer können sich nicht anmelden; Benutzer werden nie gelöscht, wenn sie der letzte Administrator sind.",
+ "conn.shared": "Mehrbenutzer – gemeinsamer Ordner im Netzwerk (ohne Server)",
+ "conn.shared.placeholder": "z. B. \\\\SERVER\\Firma\\Lieferantenkonto oder Z:\\Lieferantenkonto",
+ "conn.shared.hint": "Alle Benutzer verwenden denselben Ordner (Netzlaufwerk eines immer eingeschalteten PCs). Nur Windows-Netzwerkfreigaben verwenden – keine Cloud-Ordner (OneDrive, Dropbox …). Die App sichert die Datenbank täglich in den Unterordner „backups\\auto“. Für mehr als 3–5 gleichzeitige Benutzer ist ein Server (PostgreSQL) sicherer.",
+ "settings.database.shared": "<b>Mehrbenutzer (gemeinsamer Ordner)</b> – die Daten liegen im Ordner <b>{path}</b>. Mehrere Benutzer können gleichzeitig arbeiten; Buchungen werden nacheinander verarbeitet, Änderungen der Kollegen erscheinen automatisch.",
+ "settings.database.shared.others": "Gerade verbunden: {names}",
+ "settings.database.transfer_shared": "Daten in einen gemeinsamen Ordner übertragen …",
+ "settings.database.transfer_shared.confirm": "Alle Daten und Dokumente dieses PCs werden in den (leeren) Ordner {path} kopiert. Die lokalen Daten bleiben unverändert erhalten. Danach arbeitet die Anwendung im Mehrbenutzer-Modus mit diesem Ordner (erster Start: Administrator anlegen). Fortfahren?",
+ "settings.database.transfer_shared.done": "Die Daten wurden kopiert ({n} Dateien). Die Anwendung wird jetzt beendet; beim nächsten Start melden Sie sich an. Auf den anderen PCs: Einstellungen → Verbindung ändern → gemeinsamer Ordner."
 }

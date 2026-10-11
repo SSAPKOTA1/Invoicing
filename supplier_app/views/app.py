@@ -22,12 +22,12 @@ from supplier_app.views.theme import apply_theme
 
 def open_context(paths: AppPaths) -> AppContext | None:
     """Open the configured data source. A server that cannot be reached leads to the connection dialog."""
-    config = ConnectionConfig.load(paths.root)
+    config = ConnectionConfig.load(paths.local)
     while True:
         try:
             return build_context(paths, config)
         except SupplierAppError as exc:
-            if not config.is_server:
+            if not config.is_multi_user:
                 show_error(None, exc)
                 return None
             text = exc.message + (f"\n{exc.hint}" if exc.hint else "")
@@ -36,7 +36,7 @@ def open_context(paths: AppPaths) -> AppContext | None:
                 return None
             config = dlg.result_config
             if not config.dsn_override:
-                config.save(paths.root, keep_password=dlg.keep_password)
+                config.save(paths.local, keep_password=dlg.keep_password)
 
 
 def sign_in(ctx: AppContext) -> str:
@@ -76,7 +76,7 @@ def run_application() -> int:
         dlg = ConnectionDialog(ctx.config)  # "Verbindung ändern" on the login screen
         if not dlg.exec() or dlg.result_config is None:
             return 0
-        dlg.result_config.save(paths.root, keep_password=dlg.keep_password)
+        dlg.result_config.save(paths.local, keep_password=dlg.keep_password)
     ctrl = AppController(ctx, app)
     window = MainWindow(ctrl)
     window.show()

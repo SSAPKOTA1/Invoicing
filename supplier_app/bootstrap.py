@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from supplier_app.database.connection import Database
 from supplier_app.database.migrator import migrate, migrate_postgres
 from supplier_app.database.pg import PgDatabase
+from supplier_app.errors import DatabaseError
 from supplier_app.repositories.sqlite_repos import SqliteRepositories
 from supplier_app.settings.paths import AppPaths
 
@@ -21,11 +22,16 @@ class Storage:
         self.db.close()
 
 
-def open_storage(paths: AppPaths) -> Storage:
-    """Create folders, migrate (with backup) and open the database."""
+def open_storage(paths: AppPaths, *, shared: bool = False) -> Storage:
+    """Create folders, migrate (with backup) and open the database (``shared``: used by several PCs from a shared folder)."""
     paths.ensure()
     migrate(paths.database, backup_dir=paths.backups / "migrations")
-    db = Database(paths.database).connect()
+    db = Database(paths.database, shared=shared).connect()
+    if shared and db.scalar("PRAGMA quick_check") != "ok":
+        db.close()
+        raise DatabaseError(
+            "Die gemeinsame Datenbank ist beschädigt.",
+            hint=f"Bitte alle Benutzer abmelden und aus dem Ordner '{paths.backups / 'auto'}' die letzte Tagessicherung zurückholen.")
     return Storage(paths=paths, db=db, repos=SqliteRepositories(db))
 
 

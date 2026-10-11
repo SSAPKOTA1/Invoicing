@@ -91,7 +91,9 @@ class SettingsPage(Page):
         row = QHBoxLayout()
         self.btn_conn = button(tr("settings.database.change"), "", self.change_connection)
         self.btn_transfer = button(tr("settings.database.transfer"), "", self.transfer_to_server)
+        self.btn_transfer_shared = button(tr("settings.database.transfer_shared"), "", self.transfer_to_shared)
         row.addWidget(self.btn_conn)
+        row.addWidget(self.btn_transfer_shared)
         row.addWidget(self.btn_transfer)
         row.addStretch(1)
         card.layout_.addLayout(row)
@@ -275,8 +277,16 @@ class SettingsPage(Page):
         self.account_card.setVisible(multi)
         self.users_card.setVisible(multi and admin)
         cfg = self.ctrl.ctx.config
-        if multi:
+        if multi and cfg.is_shared:
+            registry = self.ctrl.ctx.registry
+            others = registry.others_label() if registry is not None else []
+            text = tr("settings.database.shared", path=cfg.shared_path)
+            if others:
+                text += "<br>" + tr("settings.database.shared.others", names=", ".join(others))
+            self.db_info.setText(text)
+        elif multi:
             self.db_info.setText(tr("settings.database.server", server=cfg.server_label))
+        if multi:
             self.account_info.setText(tr("settings.account.info", name=session.label, role=tr(f"role.user.{session.role.value}")))
         else:
             self.db_info.setText(tr("settings.database.local", path=str(self.ctrl.ctx.paths.root)))
@@ -284,6 +294,8 @@ class SettingsPage(Page):
         self.demo_card.setVisible(not multi)  # never fill a shared company database with sample data
         self.btn_transfer.setVisible(not multi)
         self.btn_transfer.setEnabled(admin)
+        self.btn_transfer_shared.setVisible(not multi)
+        self.btn_transfer_shared.setEnabled(admin)
         if multi and admin:
             rows = [Row([u.username, u.display_name, tr(f"role.user.{u.role.value}"),
                          tr("user.active") if u.active else tr("user.locked"), u.last_login.replace("T", " ")], u.id)
@@ -325,8 +337,25 @@ class SettingsPage(Page):
     def change_connection(self) -> None:
         dlg = ConnectionDialog(self.ctrl.ctx.config, self)
         if dlg.exec() and dlg.result_config is not None:
-            dlg.result_config.save(self.ctrl.ctx.paths.root, keep_password=dlg.keep_password)
+            dlg.result_config.save(self.ctrl.ctx.paths.local, keep_password=dlg.keep_password)
             info(self, tr("settings.database.restart"))
+            self.ctrl.app.quit()
+
+    def transfer_to_shared(self) -> None:
+        """Local data -> empty shared folder; afterwards the application works from that folder."""
+        from supplier_app.backup.transfer import transfer_to_shared
+        from supplier_app.settings.connection import MODE_SHARED, ConnectionConfig
+
+        dlg = ConnectionDialog(ConnectionConfig(mode=MODE_SHARED), self)
+        if not dlg.exec() or dlg.result_config is None or not dlg.result_config.is_shared:
+            return
+        target = dlg.result_config
+        if not confirm(self, tr("settings.database.transfer_shared.confirm", path=target.shared_path)):
+            return
+        files = self.ctrl.run(transfer_to_shared, self.ctrl.ctx.storage, target.shared_path, parent=self, notify=False)
+        if files:
+            target.save(self.ctrl.ctx.paths.local, keep_password=dlg.keep_password)
+            info(self, tr("settings.database.transfer_shared.done", n=files))
             self.ctrl.app.quit()
 
     def transfer_to_server(self) -> None:
@@ -343,7 +372,7 @@ class SettingsPage(Page):
             return
         rows = self.ctrl.run(transfer_to_server, self.ctrl.ctx.storage, target, parent=self, notify=False)
         if rows:
-            target.save(self.ctrl.ctx.paths.root, keep_password=dlg.keep_password)
+            target.save(self.ctrl.ctx.paths.local, keep_password=dlg.keep_password)
             info(self, tr("settings.database.transfer.done", n=rows))
             self.ctrl.app.quit()
 

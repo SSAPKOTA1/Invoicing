@@ -65,3 +65,4 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 - 2026-10-11 Phase 7 (change request): companies/hotels with global scope filter in every layer, due-date entry/editing, report printing; migration 004, 191 tests, ruff + selfcheck green
 - 2026-10-11 Phase 8 (change request): invoice recognition vocabulary (DE/EN/FR/IT/ES/NL), net/vat/gross cross-check, table/PDF layouts, own vocabulary in Settings
 - 2026-10-11 Phase 9 (change request): multi-user mode with PostgreSQL (users/roles/login, live refresh, shared documents, server backup, transfer, concurrency-safe bookings), CI job with PostgreSQL service
+- 2026-10-11 Phase 10 (change request): multi-user without server via shared folder (SQLite rollback journal, daily backups, session heartbeat, transfer)

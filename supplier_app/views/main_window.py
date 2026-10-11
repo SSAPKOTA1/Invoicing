@@ -342,5 +342,6 @@ class MainWindow(QMainWindow):
             self.ctrl.app.quit()
             return
         self.refresh_user()
+        self.ctrl.register_session()
         self.ctrl.user_changed.emit()
         self.ctrl.notify_changed()
