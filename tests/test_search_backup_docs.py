@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 import zipfile
 from datetime import date
 
@@ -57,16 +56,16 @@ def test_search_by_payment_amount(svc, booked) -> None:
     assert booked.invoice.id in svc.search.search("123,45").invoice_ids()
 
 
-def test_backup_restore_roundtrip(file_svc, file_storage) -> None:
-    svc = file_svc
+def test_backup_restore_roundtrip(svc, storage) -> None:
     sc = make_scenario(svc)
-    src = file_storage.paths.root / "scan.txt"
+    src = storage.paths.root / "scan.txt"
     src.write_text("Rechnung RE-2024/001", encoding="utf-8")
     doc, created = svc.documents.store_file(src)
     assert created and svc.documents.file_path(doc).exists()
     zip_path = svc.backup.create_backup()
     manifest = BackupService.verify_backup(zip_path)
-    assert manifest["schema_version"] == LATEST_VERSION and doc.stored_path in manifest["documents"]
+    assert manifest["schema_version"] == LATEST_VERSION and manifest["rows"]["documents"] == 1
+    assert manifest["rows"]["document_files"] == 1  # the document files are part of the backup
     # change state after the backup
     svc.payments.record_payment(sc.supplier.id, date(2024, 4, 1), 5000, [sc.invoice.id])
     svc.documents.file_path(doc).unlink()
@@ -74,21 +73,20 @@ def test_backup_restore_roundtrip(file_svc, file_storage) -> None:
     result = svc.backup.restore_backup(zip_path)
     assert result.documents == 1 and result.safety_backup.exists()
     assert svc.ledger.invoice_balance(sc.invoice.id).balance_cents == 100000
-    assert svc.documents.file_path(doc).exists()
-    assert file_storage.db.integrity_ok()
+    assert svc.documents.file_path(doc).read_text(encoding="utf-8") == "Rechnung RE-2024/001"  # fetched from the database
+    assert storage.db.integrity_ok()
 
 
-def test_backup_rejects_tampering_and_garbage(file_svc, file_storage, tmp_path) -> None:
-    make_scenario(file_svc)
-    good = file_svc.backup.create_backup(tmp_path / "out")
+def test_backup_rejects_tampering_and_garbage(svc, storage, tmp_path) -> None:
+    make_scenario(svc)
+    good = svc.backup.create_backup(tmp_path / "out")
     assert good.parent == tmp_path / "out"
-    # tamper with the database inside the zip
-    bad = tmp_path / "bad.zip"
+    bad = tmp_path / "bad.zip"  # a row missing in a table
     with zipfile.ZipFile(good) as zin, zipfile.ZipFile(bad, "w") as zout:
         for item in zin.infolist():
             data = zin.read(item.filename)
-            if item.filename == "supplier.db":
-                data = data[:-10] + b"XXXXXXXXXX"
+            if item.filename == "tables/invoices.jsonl":
+                data = b""
             zout.writestr(item, data)
     with pytest.raises(BackupError):
         BackupService.verify_backup(bad)
@@ -107,28 +105,12 @@ def test_backup_rejects_tampering_and_garbage(file_svc, file_storage, tmp_path) 
     with pytest.raises(BackupError):
         BackupService.verify_backup(slip)
     with pytest.raises(BackupError):
-        file_svc.backup.restore_backup(garbage)
-    # DB still usable after failed restore
-    assert file_storage.db.integrity_ok()
+        svc.backup.restore_backup(garbage)
+    assert storage.db.integrity_ok() and svc.invoices.list()  # data untouched after a failed restore
 
 
-def test_restore_of_older_schema_gets_migrated(file_svc, file_storage, tmp_path) -> None:
-    from supplier_app.database.migrator import migrate
-    old_db = tmp_path / "old" / "supplier.db"
-    migrate(old_db, None, target_version=1)
-    import hashlib
-    import json
-    zp = tmp_path / "old.zip"
-    with zipfile.ZipFile(zp, "w") as z:
-        z.write(old_db, "supplier.db")
-        z.writestr("manifest.json", json.dumps({
-            "schema_version": 1, "db_sha256": hashlib.sha256(old_db.read_bytes()).hexdigest(), "documents": {}}))
-    file_svc.backup.restore_backup(zp)
-    assert file_storage.db.schema_version() == LATEST_VERSION
-
-
-def test_document_store_rules(file_svc, tmp_path) -> None:
-    docs = file_svc.documents
+def test_document_store_rules(svc, tmp_path) -> None:
+    docs = svc.documents
     f = tmp_path / "a b.txt"
     f.write_text("hallo", encoding="utf-8")
     d1, created = docs.store_file(f)
@@ -164,4 +146,3 @@ def test_ledger_invariants_hold(svc) -> None:
         b = state.balance
         assert b.balance_cents == b.open_costs_cents + b.open_interest_cents + b.open_principal_cents
         assert b.balance_cents == svc.ledger.invoice_balance(state.invoice.id).balance_cents
-    sqlite3.connect(":memory:").close()

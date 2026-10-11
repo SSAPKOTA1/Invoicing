@@ -1,4 +1,4 @@
-"""Settings: theme, PIN, paths, Tesseract, rates, allocation rule, reference keywords, backup / restore, demo data."""
+"""Settings: theme, companies/hotels, database, users, idle lock, paths, Tesseract, rates, allocation rule, reference keywords, backup / restore, demo data."""
 
 from __future__ import annotations
 
@@ -30,7 +30,6 @@ from supplier_app.models.enums import AllocationRule, ReferenceType
 from supplier_app.util.dates import format_date
 from supplier_app.views.dialogs.connection_dialog import ConnectionDialog
 from supplier_app.views.dialogs.login_dialog import PasswordDialog, UserDialog
-from supplier_app.views.dialogs.pin_dialog import ChangePinDialog
 from supplier_app.views.errors import confirm, info, show_error
 from supplier_app.views.pages.base import Page
 from supplier_app.views.widgets.common import Card, button, muted, page_title, scroll_wrap
@@ -52,7 +51,7 @@ class SettingsPage(Page):
         root.setSpacing(14)
         root.addWidget(page_title(tr("nav.settings")))
         for builder in (self._appearance, self._organization, self._database, self._account, self._users, self._security, self._paths, self._tesseract, self._interest, self._allocation,
-                        self._references, self._vocabulary, self._backup, self._demo):
+                        self._references, self._vocabulary, self._backup, self._about):
             root.addWidget(builder())
         root.addStretch(1)
 
@@ -90,13 +89,11 @@ class SettingsPage(Page):
         card.add(self.db_info)
         row = QHBoxLayout()
         self.btn_conn = button(tr("settings.database.change"), "", self.change_connection)
-        self.btn_transfer = button(tr("settings.database.transfer"), "", self.transfer_to_server)
-        self.btn_transfer_shared = button(tr("settings.database.transfer_shared"), "", self.transfer_to_shared)
         self.btn_all = button(tr("settings.database.all_pcs"), "", self.save_for_all_pcs)
+        self.btn_legacy = button(tr("settings.database.legacy"), "", self.import_legacy)
         row.addWidget(self.btn_conn)
         row.addWidget(self.btn_all)
-        row.addWidget(self.btn_transfer_shared)
-        row.addWidget(self.btn_transfer)
+        row.addWidget(self.btn_legacy)
         row.addStretch(1)
         card.layout_.addLayout(row)
         card.add(muted(tr("settings.database.hint")))
@@ -130,16 +127,6 @@ class SettingsPage(Page):
     def _security(self) -> Card:
         card = Card(tr("settings.security"))
         self.security_card = card
-        self.pin_state = QLabel()
-        card.add(self.pin_state)
-        row = QHBoxLayout()
-        self.btn_set = button(tr("pin.set.title"), "", lambda: self._pin("set"))
-        self.btn_change = button(tr("pin.change.title"), "", lambda: self._pin("change"))
-        self.btn_disable = button(tr("pin.disable.title"), "danger", lambda: self._pin("disable"))
-        for b in (self.btn_set, self.btn_change, self.btn_disable):
-            row.addWidget(b)
-        row.addStretch(1)
-        card.layout_.addLayout(row)
         form = QFormLayout()
         self.idle = QSpinBox()
         self.idle.setRange(0, 240)
@@ -147,7 +134,7 @@ class SettingsPage(Page):
         self.idle.editingFinished.connect(self._save_idle)
         form.addRow(tr("settings.idle"), self.idle)
         card.layout_.addLayout(form)
-        card.add(muted(tr("settings.pin.recovery")))
+        card.add(muted(tr("settings.idle.hint")))
         return card
 
     def _paths(self) -> Card:
@@ -259,11 +246,8 @@ class SettingsPage(Page):
         card.add(muted(tr("settings.backup.hint")))
         return card
 
-    def _demo(self) -> Card:
-        card = Card(tr("settings.demo"))
-        self.demo_card = card
-        card.add(muted(tr("settings.demo.hint")))
-        card.add(button(tr("action.demo"), "", self.load_demo))
+    def _about(self) -> Card:
+        card = Card(tr("settings.about.title"))
         self.about = QLabel(tr("settings.about"))
         self.about.setObjectName("Muted")
         self.about.setWordWrap(True)
@@ -272,35 +256,16 @@ class SettingsPage(Page):
 
     # -- state -----------------------------------------------------------------------------------------------------
     def _refresh_multi_user(self) -> None:
-        multi = self.ctrl.multi_user
         session = self.svc.session
         admin = session.is_admin
-        self.security_card.setVisible(not multi)  # the PIN lock is replaced by the user passwords
-        self.account_card.setVisible(multi)
-        self.users_card.setVisible(multi and admin)
         cfg = self.ctrl.ctx.config
-        if multi and cfg.is_shared:
-            registry = self.ctrl.ctx.registry
-            others = registry.others_label() if registry is not None else []
-            text = tr("settings.database.shared", path=cfg.shared_path)
-            if others:
-                text += "<br>" + tr("settings.database.shared.others", names=", ".join(others))
-            self.db_info.setText(text)
-        elif multi:
-            self.db_info.setText(tr("settings.database.server", server=cfg.server_label))
-        if multi:
-            self.account_info.setText(tr("settings.account.info", name=session.label, role=tr(f"role.user.{session.role.value}")))
-        else:
-            self.db_info.setText(tr("settings.database.local", path=str(self.ctrl.ctx.paths.root)))
+        self.users_card.setVisible(admin)
+        self.db_info.setText(tr("settings.database.server", server=cfg.server_label))
+        self.account_info.setText(tr("settings.account.info", name=session.label, role=tr(f"role.user.{session.role.value}")))
         self.btn_conn.setEnabled(admin and not cfg.dsn_override)
-        self.demo_card.setVisible(not multi)  # never fill a shared company database with sample data
-        self.btn_all.setVisible(multi and cfg.is_shared)
-        self.btn_all.setEnabled(admin)
-        self.btn_transfer.setVisible(not multi)
-        self.btn_transfer.setEnabled(admin)
-        self.btn_transfer_shared.setVisible(not multi)
-        self.btn_transfer_shared.setEnabled(admin)
-        if multi and admin:
+        self.btn_all.setEnabled(admin and not cfg.dsn_override)
+        self.btn_legacy.setEnabled(admin)
+        if admin:
             rows = [Row([u.username, u.display_name, tr(f"role.user.{u.role.value}"),
                          tr("user.active") if u.active else tr("user.locked"), u.last_login.replace("T", " ")], u.id)
                     for u in self.svc.users.users()]
@@ -341,7 +306,7 @@ class SettingsPage(Page):
     def change_connection(self) -> None:
         dlg = ConnectionDialog(self.ctrl.ctx.config, self)
         if dlg.exec() and dlg.result_config is not None:
-            dlg.result_config.save(self.ctrl.ctx.paths.local, keep_password=dlg.keep_password)
+            dlg.result_config.save(self.ctrl.ctx.paths.root, keep_password=dlg.keep_password)
             info(self, tr("settings.database.restart"))
             self.ctrl.app.quit()
 
@@ -350,50 +315,21 @@ class SettingsPage(Page):
         if path:
             info(self, tr("settings.database.all_pcs.done", path=str(path)))
 
-    def transfer_to_shared(self) -> None:
-        """Local data -> empty shared folder; afterwards the application works from that folder."""
-        from supplier_app.backup.transfer import transfer_to_shared
-        from supplier_app.settings.connection import MODE_SHARED, ConnectionConfig
+    def import_legacy(self) -> None:
+        """One-time import of the data of the old single-user version (supplier.db) into this empty server database."""
+        from supplier_app.backup.legacy import import_legacy_database
 
-        dlg = ConnectionDialog(ConnectionConfig(mode=MODE_SHARED), self)
-        if not dlg.exec() or dlg.result_config is None or not dlg.result_config.is_shared:
+        path, _ = QFileDialog.getOpenFileName(self, tr("settings.database.legacy"), "", "supplier.db (*.db);;Alle Dateien (*)")
+        if not path or not confirm(self, tr("settings.database.legacy.confirm", path=path)):
             return
-        target = dlg.result_config
-        if not confirm(self, tr("settings.database.transfer_shared.confirm", path=target.shared_path)):
-            return
-        files = self.ctrl.run(transfer_to_shared, self.ctrl.ctx.storage, target.shared_path, parent=self, notify=False)
-        if files:
-            target.save(self.ctrl.ctx.paths.local, keep_password=dlg.keep_password)
-            info(self, tr("settings.database.transfer_shared.done", n=files))
-            self.ctrl.app.quit()
-
-    def transfer_to_server(self) -> None:
-        """Local data -> empty server database; afterwards the application starts in the multi-user mode."""
-        from supplier_app.backup.transfer import transfer_to_server
-        from supplier_app.settings.connection import MODE_SERVER, ConnectionConfig
-
-        cfg = ConnectionConfig(mode=MODE_SERVER)
-        dlg = ConnectionDialog(cfg, self)
-        if not dlg.exec() or dlg.result_config is None or not dlg.result_config.is_server:
-            return
-        target = dlg.result_config
-        if not confirm(self, tr("settings.database.transfer.confirm", server=target.server_label)):
-            return
-        rows = self.ctrl.run(transfer_to_server, self.ctrl.ctx.storage, target, parent=self, notify=False)
+        rows = self.ctrl.run(import_legacy_database, path, self.ctrl.ctx.storage.db, parent=self)
         if rows:
-            target.save(self.ctrl.ctx.paths.local, keep_password=dlg.keep_password)
-            info(self, tr("settings.database.transfer.done", n=rows))
-            self.ctrl.app.quit()
+            info(self, tr("settings.database.legacy.done", n=rows))
 
     def refresh(self) -> None:
         self._refresh_multi_user()
         s = self.svc.settings
         self.theme.setCurrentIndex(self.theme.findData(s.theme))
-        enabled = self.svc.pin.enabled
-        self.pin_state.setText(tr("settings.pin.on") if enabled else tr("settings.pin.off"))
-        self.btn_set.setEnabled(not enabled)
-        self.btn_change.setEnabled(enabled)
-        self.btn_disable.setEnabled(enabled)
         self.idle.setValue(s.get_int("idle_lock_minutes"))
         self.tess_path.setText(s.get("tesseract_path"))
         self.debtor.setCurrentIndex(self.debtor.findData(s.debtor_type))
@@ -483,11 +419,6 @@ class SettingsPage(Page):
         self.rates.set_data([tr("settings.rate.valid_from"), tr("settings.rate.base")], rows, [160, 120])
 
     # -- actions ----------------------------------------------------------------------------------------------------------
-    def _pin(self, mode: str) -> None:
-        if ChangePinDialog(self.svc.pin, mode, self).exec():
-            self.ctrl.restart_idle_timer()
-            self.refresh()
-
     def _save_idle(self) -> None:
         self.svc.settings.set("idle_lock_minutes", str(self.idle.value()))
         self.ctrl.restart_idle_timer()
@@ -571,10 +502,5 @@ class SettingsPage(Page):
             if result and result is not True:
                 info(self, tr("settings.backup.restored"), tr("settings.backup.safety", path=str(result.safety_backup)))
 
-    def load_demo(self) -> None:
-        if self.ctrl.ctx.demo.has_data() and not confirm(self, tr("settings.demo.confirm")):
-            return
-        if self.ctrl.run(self.ctrl.ctx.demo.load, parent=self, success=tr("settings.demo.done")):
-            self.ctrl.navigate.emit("dashboard")
 
 

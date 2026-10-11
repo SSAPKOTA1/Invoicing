@@ -1,18 +1,18 @@
-"""SQLite implementations of :class:`InvoiceRepository` and :class:`LedgerRepository`."""
+"""PostgreSQL implementations of :class:`InvoiceRepository` and :class:`LedgerRepository`."""
 
 from __future__ import annotations
 
-import sqlite3
 from datetime import date
 from decimal import Decimal
 
 from supplier_app.database.errors import INTEGRITY_ERRORS
+from supplier_app.database.pg import Row
 from supplier_app.errors import DuplicateError, LedgerError, NotFoundError
 from supplier_app.models.entities import Invoice, LedgerEntry
 from supplier_app.models.enums import InvoiceStatus, LedgerEntryType
 from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import InvoiceRepository, LedgerRepository
-from supplier_app.repositories.sqlite_base import SqliteRepo, d2s, like_escape, must_date, s2d, stamp
+from supplier_app.repositories.pg_base import PgRepo, d2s, like_escape, must_date, s2d, stamp
 from supplier_app.util.normalize import normalize_reference
 
 _INV_COLS = (
@@ -40,7 +40,7 @@ def ledger_scope(scope: Scope | None) -> tuple[str, str, list[object]]:
     return joins, cond, [val, val]
 
 
-def _invoice(row: sqlite3.Row) -> Invoice:
+def _invoice(row: Row) -> Invoice:
     return Invoice(
         id=row["id"], supplier_id=row["supplier_id"], invoice_number=row["invoice_number"],
         invoice_date=must_date(row["invoice_date"]), due_date=s2d(row["due_date"]), net_cents=row["net_cents"],
@@ -51,7 +51,7 @@ def _invoice(row: sqlite3.Row) -> Invoice:
     )
 
 
-class SqliteInvoiceRepository(SqliteRepo, InvoiceRepository):
+class PgInvoiceRepository(PgRepo, InvoiceRepository):
     def add(self, invoice: Invoice) -> Invoice:
         invoice.created_at = stamp(invoice.created_at)
         try:
@@ -150,7 +150,7 @@ _LEDGER_COLS = (
 _LEDGER_COLS_E = ", ".join(f"e.{c.strip()}" for c in _LEDGER_COLS.split(","))
 
 
-def _entry(row: sqlite3.Row) -> LedgerEntry:
+def _entry(row: Row) -> LedgerEntry:
     return LedgerEntry(
         id=row["id"], entry_date=must_date(row["entry_date"]), supplier_id=row["supplier_id"],
         invoice_id=row["invoice_id"], entry_type=LedgerEntryType(row["entry_type"]),
@@ -160,7 +160,7 @@ def _entry(row: sqlite3.Row) -> LedgerEntry:
     )
 
 
-class SqliteLedgerRepository(SqliteRepo, LedgerRepository):
+class PgLedgerRepository(PgRepo, LedgerRepository):
     def append(self, entry: LedgerEntry) -> LedgerEntry:
         entry.created_at = stamp(entry.created_at)
         try:

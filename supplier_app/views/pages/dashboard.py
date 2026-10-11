@@ -82,8 +82,6 @@ class DashboardPage(Page):
         self.empty_card.add(muted(tr("dash.empty.text")))
         row = QHBoxLayout()
         row.addWidget(button(tr("action.import"), "primary", self.ctrl.import_requested.emit))
-        if not self.ctrl.multi_user:
-            row.addWidget(button(tr("action.demo"), "", self._load_demo))
         row.addStretch(1)
         self.empty_card.layout_.addLayout(row)
         root.addWidget(self.empty_card)
@@ -295,9 +293,6 @@ class DashboardPage(Page):
             self.ctrl.open_supplier.emit(item.open_id)
         elif item.target:
             self._drill(item.target)
-
-    def _load_demo(self) -> None:
-        self.ctrl.run(self.ctrl.ctx.demo.load, parent=self, success=tr("settings.demo.done"))
 
     def _export_png(self) -> None:
         path, _ = QFileDialog.getSaveFileName(self, tr("dash.export.png"), str(self.ctrl.ctx.paths.exports / "dashboard.png"),

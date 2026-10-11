@@ -1,4 +1,4 @@
-"""GUI start-up: choose the data location (local file or server), log in, open the main window."""
+"""GUI start-up: connect to the PostgreSQL server, sign in, open the main window."""
 
 from __future__ import annotations
 
@@ -14,33 +14,35 @@ from supplier_app.settings.connection import ConnectionConfig
 from supplier_app.settings.paths import AppPaths, default_paths
 from supplier_app.views.dialogs.connection_dialog import ConnectionDialog
 from supplier_app.views.dialogs.login_dialog import FirstAdminDialog, LoginDialog
-from supplier_app.views.dialogs.pin_dialog import UnlockDialog
-from supplier_app.views.errors import install_excepthook, show_error
+from supplier_app.views.errors import install_excepthook
 from supplier_app.views.main_window import MainWindow
 from supplier_app.views.theme import apply_theme
 
 
 def open_context(paths: AppPaths) -> AppContext | None:
-    """Open the configured data source. A server that cannot be reached leads to the connection dialog."""
-    config = ConnectionConfig.load(paths.local)
+    """Connect to the server. Missing or wrong settings (first start, server not reachable) open the connection dialog."""
+    config = ConnectionConfig.load(paths.root)
+    error = ""
     while True:
-        try:
-            return build_context(paths, config)
-        except SupplierAppError as exc:
-            if not config.is_multi_user:
-                show_error(None, exc)
-                return None
-            text = exc.message + (f"\n{exc.hint}" if exc.hint else "")
-            dlg = ConnectionDialog(config, error=text)
+        if not config.is_configured or error:
+            dlg = ConnectionDialog(config, error=error)
             if not dlg.exec() or dlg.result_config is None:
                 return None
             config = dlg.result_config
-            if not config.dsn_override:
-                config.save(paths.local, keep_password=dlg.keep_password)
+            config.save(paths.root, keep_password=dlg.keep_password)
+        try:
+            return build_context(paths, config)
+        except SupplierAppError as exc:
+            error = exc.message + (f"\n{exc.hint}" if exc.hint else "")
+            if config.dsn_override:  # settings come from the environment: nothing to edit here
+                from supplier_app.views.errors import show_error
+
+                show_error(None, exc)
+                return None
 
 
 def sign_in(ctx: AppContext) -> str:
-    """Multi-user mode: first administrator or login. Returns 'ok', 'quit' or 'connection' (user wants to change the server)."""
+    """First administrator or login. Returns 'ok', 'quit' or 'connection' (the user wants to change the server)."""
     users = ctx.services.users
     if users.needs_first_admin():
         return "ok" if FirstAdminDialog(users).exec() else "quit"
@@ -61,12 +63,6 @@ def run_application() -> int:
         if ctx is None:
             return 2
         apply_theme(app, ctx.services.settings.theme)
-        if not ctx.multi_user:
-            pin = ctx.services.pin
-            if pin.enabled and not UnlockDialog(pin).exec():
-                ctx.close()
-                return 0
-            break
         outcome = sign_in(ctx)
         if outcome == "ok":
             break
@@ -76,7 +72,7 @@ def run_application() -> int:
         dlg = ConnectionDialog(ctx.config)  # "Verbindung ändern" on the login screen
         if not dlg.exec() or dlg.result_config is None:
             return 0
-        dlg.result_config.save(paths.local, keep_password=dlg.keep_password)
+        dlg.result_config.save(paths.root, keep_password=dlg.keep_password)
     ctrl = AppController(ctx, app)
     window = MainWindow(ctrl)
     window.show()

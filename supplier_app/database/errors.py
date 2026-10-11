@@ -1,20 +1,11 @@
-"""Backend independent database error classes."""
+"""Database error classes (PostgreSQL)."""
 
 from __future__ import annotations
 
-import sqlite3
+import psycopg
+import psycopg.errors as _pgerr
 
-try:  # psycopg is only needed for the server (multi-user) mode
-    import psycopg
-    import psycopg.errors as _pgerr
+#: raised by constraint violations (UNIQUE, CHECK, FOREIGN KEY, triggers)
+INTEGRITY_ERRORS: tuple[type[BaseException], ...] = (_pgerr.IntegrityError,)
 
-    PG_AVAILABLE = True
-except ImportError:  # pragma: no cover - psycopg is a requirement, the fallback keeps local mode usable
-    psycopg = None  # type: ignore[assignment]
-    _pgerr = None  # type: ignore[assignment]
-    PG_AVAILABLE = False
-
-#: raised by constraint violations (UNIQUE, CHECK, FOREIGN KEY, triggers) in either backend
-INTEGRITY_ERRORS: tuple[type[BaseException], ...] = (
-    (sqlite3.IntegrityError, _pgerr.IntegrityError) if PG_AVAILABLE else (sqlite3.IntegrityError,)
-)
+__all__ = ["INTEGRITY_ERRORS", "psycopg"]

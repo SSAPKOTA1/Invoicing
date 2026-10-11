@@ -6,7 +6,6 @@ from decimal import Decimal
 import pytest
 
 from supplier_app.errors import (
-    AuthError,
     DuplicateError,
     LedgerError,
     NotFoundError,
@@ -347,7 +346,7 @@ def test_history_timeline_order_and_running(svc) -> None:
     assert svc.history.invoice_history(sc.invoice.id).next_deadline is None
 
 
-def test_settings_and_pin(svc) -> None:
+def test_settings(svc) -> None:
     st = svc.settings
     assert st.theme == "dark" and st.debtor_type == "b2b" and st.flat_fee_cents == 4000
     st.set_theme("light")
@@ -370,59 +369,6 @@ def test_settings_and_pin(svc) -> None:
     assert st.reference_rules() == {}
     st.set_rate(date(2026, 1, 1), Decimal("1.27"))
     assert st.rate_points()[-1].base_rate == Decimal("1.27")
-
-
-class Clock:
-    def __init__(self) -> None:
-        from datetime import datetime
-        self.now = datetime(2025, 1, 1, 12, 0, 0)
-
-    def __call__(self):
-        return self.now
-
-
-def test_pin_flow(storage) -> None:
-    from datetime import timedelta
-
-    from supplier_app.services.pin_service import PinService
-    clock = Clock()
-    pin = PinService(storage.repos, clock=clock)
-    assert not pin.enabled and pin.verify("anything")
-    with pytest.raises(ValidationError):
-        pin.set_pin("12")
-    with pytest.raises(ValidationError):
-        pin.set_pin("abcd")
-    pin.set_pin("1234")
-    assert pin.enabled and pin.verify("1234")
-    stored = storage.repos.settings.get("pin_hash")
-    assert stored and "1234" not in stored and len(storage.repos.settings.get("pin_salt")) == 32
-    for _ in range(5):
-        assert pin.verify("0000") is False
-    assert pin.lockout_seconds_left() == 30
-    with pytest.raises(AuthError):
-        pin.verify("1234")  # locked although correct
-    clock.now += timedelta(seconds=31)
-    assert pin.verify("1234") is True and pin.lockout_seconds_left() == 0
-    # second lockout is longer
-    for _ in range(5):
-        pin.verify("9999")
-    assert pin.lockout_seconds_left() == 30
-    clock.now += timedelta(seconds=31)
-    assert pin.verify("1234")
-    # change requires current pin
-    with pytest.raises(AuthError):
-        pin.set_pin("5678", "wrong")
-    pin.set_pin("5678", "1234")
-    assert pin.verify("5678") and not pin.verify("1234")
-    # disable requires current pin
-    with pytest.raises(AuthError):
-        pin.disable("1234")
-    pin.disable("5678")
-    assert not pin.enabled
-    pin.disable("x")  # no-op
-    pin.set_pin("4321")
-    pin.reset()
-    assert not pin.enabled
 
 
 def test_suppliers_service_validation(svc) -> None:

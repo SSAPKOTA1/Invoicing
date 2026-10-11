@@ -32,7 +32,7 @@ from supplier_app.models.enums import (
     ReferenceType,
     ReviewStatus,
 )
-from supplier_app.repositories.sqlite_documents import fts_query_from_text
+from supplier_app.repositories.pg_documents import search_words
 from supplier_app.util.normalize import normalize_reference
 
 
@@ -198,20 +198,20 @@ def test_documents_fts_and_references(repos) -> None:
     with pytest.raises(DuplicateError):
         repos.documents.add(Document(stored_path="b.pdf", sha256="a" * 64, original_name="b.pdf"))
     assert repos.documents.get_by_hash("a" * 64).id == doc.id
-    hits = repos.documents.fulltext(fts_query_from_text("zahlungserinn"))
+    hits = repos.documents.fulltext(search_words("zahlungserinn"))
     assert hits and hits[0][0] == doc.id and "[" in hits[0][1]
-    assert repos.documents.fulltext(fts_query_from_text("ueberweisung")) == []  # umlaut folding is ü->u, not ue
-    assert repos.documents.fulltext(fts_query_from_text("uberweisung"))
+    assert repos.documents.fulltext(search_words("ueberweisung")) == []  # umlaut folding is ü->u, not ue
+    assert repos.documents.fulltext(search_words("uberweisung"))
     doc.ocr_text = "ganz anderer Text"
     doc.doc_type = DocumentType.INVOICE
     doc.review_status = ReviewStatus.NEEDS_REVIEW
     repos.documents.update(doc)
-    assert repos.documents.fulltext(fts_query_from_text("zahlungserinnerung")) == []
-    assert repos.documents.fulltext(fts_query_from_text("anderer"))
+    assert repos.documents.fulltext(search_words("zahlungserinnerung")) == []
+    assert repos.documents.fulltext(search_words("anderer"))
     assert repos.documents.count_by_status() == {"needs_review": 1}
     assert len(repos.documents.list(review_status=ReviewStatus.NEEDS_REVIEW, limit=5)) == 1
     with pytest.raises(ValidationError):
-        repos.documents.fulltext('"unterminated')
+        repos.documents.fulltext([])
 
     ref = DocumentReference("document", doc.id, ReferenceType.PROCESSING_NUMBER, "4711/A",
                             normalize_reference("4711/A"))

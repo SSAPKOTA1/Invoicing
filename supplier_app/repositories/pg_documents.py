@@ -1,21 +1,21 @@
-"""SQLite implementations of document, reference and case repositories."""
+"""PostgreSQL implementations of document, reference and case repositories."""
 
 from __future__ import annotations
 
 import re
-import sqlite3
 
 from supplier_app.database.errors import INTEGRITY_ERRORS
-from supplier_app.errors import DatabaseError, DuplicateError, NotFoundError, ValidationError
+from supplier_app.database.pg import Row
+from supplier_app.errors import DuplicateError, NotFoundError, ValidationError
 from supplier_app.models.entities import Case, CaseEvent, Document, DocumentReference
 from supplier_app.models.enums import CaseStatus, DocumentType, ReferenceType, ReviewStatus
 from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import CaseRepository, DocumentRepository, ReferenceRepository
-from supplier_app.repositories.sqlite_base import SqliteRepo, d2s, like_escape, must_date, stamp
-from supplier_app.repositories.sqlite_invoices import scope_clause
+from supplier_app.repositories.pg_base import PgRepo, d2s, like_escape, must_date, stamp
+from supplier_app.repositories.pg_invoices import scope_clause
 
 
-def _document(row: sqlite3.Row) -> Document:
+def _document(row: Row) -> Document:
     return Document(
         id=row["id"], stored_path=row["stored_path"], sha256=row["sha256"], original_name=row["original_name"],
         page_count=row["page_count"], doc_type=DocumentType(row["doc_type"]), ocr_text=row["ocr_text"],
@@ -25,7 +25,7 @@ def _document(row: sqlite3.Row) -> Document:
     )
 
 
-class SqliteDocumentRepository(SqliteRepo, DocumentRepository):
+class PgDocumentRepository(PgRepo, DocumentRepository):
     def add(self, doc: Document) -> Document:
         doc.created_at = stamp(doc.created_at)
         try:
@@ -85,19 +85,6 @@ class SqliteDocumentRepository(SqliteRepo, DocumentRepository):
             params.append(limit)
         return [_document(r) for r in self.db.query_all(sql, params)]
 
-    def fulltext(self, fts_query: str, limit: int = 50) -> list[tuple[int, str]]:
-        if getattr(self.db, "backend", "sqlite") == "postgres":
-            return self._fulltext_pg(fts_query, limit)
-        try:
-            rows = self.db.query_all(
-                "SELECT rowid, snippet(document_fts, 1, '[', ']', ' … ', 12) FROM document_fts"
-                " WHERE document_fts MATCH ? ORDER BY rank LIMIT ?",
-                (fts_query, limit),
-            )
-        except DatabaseError as exc:
-            raise ValidationError("Ungültige Suchanfrage.") from exc
-        return [(r[0], r[1]) for r in rows]
-
     def save_file(self, doc_id: int, content: bytes) -> None:
         self.db.execute(
             "INSERT INTO document_files(document_id, content) VALUES (?,?)"
@@ -107,9 +94,9 @@ class SqliteDocumentRepository(SqliteRepo, DocumentRepository):
         row = self.db.query_one("SELECT content FROM document_files WHERE document_id=?", (doc_id,))
         return bytes(row[0]) if row else None
 
-    def _fulltext_pg(self, fts_query: str, limit: int) -> list[tuple[int, str]]:
-        """PostgreSQL text search over file name + OCR text (prefix match per word, all words must occur)."""
-        words = [fold_word(w) for w in re.findall(r'"([^"]+)"\*', fts_query)]
+    def fulltext(self, words: list[str], limit: int = 50) -> list[tuple[int, str]]:
+        """Text search over file name + OCR text (prefix match per word, all words must occur); ``words`` from
+        :func:`search_words`. Returns ``(document_id, excerpt)``."""
         words = [w for w in words if w]
         if not words:
             raise ValidationError("Ungültige Suchanfrage.")
@@ -124,9 +111,9 @@ class SqliteDocumentRepository(SqliteRepo, DocumentRepository):
         return {r[0]: r[1] for r in self.db.query_all("SELECT review_status, COUNT(*) FROM documents GROUP BY 1")}
 
 
-class SqliteReferenceRepository(SqliteRepo, ReferenceRepository):
+class PgReferenceRepository(PgRepo, ReferenceRepository):
     @staticmethod
-    def _ref(row: sqlite3.Row) -> DocumentReference:
+    def _ref(row: Row) -> DocumentReference:
         return DocumentReference(
             id=row["id"], owner_kind=row["owner_kind"], owner_id=row["owner_id"],
             ref_type=ReferenceType(row["ref_type"]), raw_value=row["raw_value"],
@@ -165,7 +152,7 @@ class SqliteReferenceRepository(SqliteRepo, ReferenceRepository):
         return [self._ref(r) for r in rows]
 
 
-def _case(row: sqlite3.Row) -> Case:
+def _case(row: Row) -> Case:
     return Case(
         id=row["id"], supplier_id=row["supplier_id"], invoice_id=row["invoice_id"], title=row["title"],
         status=CaseStatus(row["status"]), notes=row["notes"], opened_at=row["opened_at"],
@@ -173,7 +160,7 @@ def _case(row: sqlite3.Row) -> Case:
     )
 
 
-class SqliteCaseRepository(SqliteRepo, CaseRepository):
+class PgCaseRepository(PgRepo, CaseRepository):
     def add(self, case: Case) -> Case:
         case.opened_at = stamp(case.opened_at)
         try:
@@ -235,10 +222,9 @@ class SqliteCaseRepository(SqliteRepo, CaseRepository):
         ]
 
 
-def fts_query_from_text(text: str) -> str:
-    """Turn free user text into a safe FTS5 prefix query (``abc def -> "abc"* "def"*``)."""
-    tokens = re.findall(r"[\w]+", text, flags=re.UNICODE)
-    return " ".join(f'"{t}"*' for t in tokens)
+def search_words(text: str) -> list[str]:
+    """Free user text -> folded words (lower case, accents removed) for :meth:`fulltext`."""
+    return [w for w in (fold_word(t) for t in re.findall(r"\w+", text, flags=re.UNICODE)) if w]
 
 
 _FOLD = str.maketrans("äöüéèêëàáâíìîïóòôúùûçñ", "aoueeeeaaaiiiiooouuucn")
@@ -250,7 +236,7 @@ def fold_word(word: str) -> str:
 
 
 def _snippet(text: str, words: list[str]) -> str:
-    """A short excerpt around the first match with the match in [brackets] (like FTS5's snippet())."""
+    """A short excerpt around the first match with the match in [brackets] ."""
     folded = text.lower().translate(_FOLD)  # same length as the text: positions carry over
     for word in words:
         pos = folded.find(word)

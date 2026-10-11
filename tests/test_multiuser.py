@@ -7,7 +7,7 @@ from datetime import date
 
 import pytest
 
-from supplier_app.bootstrap import open_pg_storage
+from supplier_app.bootstrap import open_storage
 from supplier_app.errors import DuplicateError
 from supplier_app.models.enums import UserRole
 from supplier_app.services.container import build_services
@@ -23,7 +23,7 @@ def clients(pg_dsn, tmp_path):
 
     def make(name: str):
         paths = AppPaths(tmp_path / f"pc-{name}").ensure()
-        storage = open_pg_storage(paths, pg_dsn)
+        storage = open_storage(paths, pg_dsn)
         svc = build_services(storage, multi_user=True, prefs=LocalPrefs(paths.root / "prefs.json"))
         opened.append(storage)
         return svc
@@ -116,7 +116,7 @@ def test_two_clients_migrating_at_the_same_time(pg_template, tmp_path) -> None:
     dsn = psycopg.conninfo.make_conninfo(pg_template, dbname=name)
     try:
         def start(i: int):
-            st = open_pg_storage(AppPaths(tmp_path / f"m{i}").ensure(), dsn)
+            st = open_storage(AppPaths(tmp_path / f"m{i}").ensure(), dsn)
             version = st.db.schema_version()
             st.close()
             return version

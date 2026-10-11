@@ -188,7 +188,7 @@ class DocumentRepository(ABC):
     @abstractmethod
     def load_file(self, doc_id: int) -> bytes | None: ...
     @abstractmethod
-    def fulltext(self, fts_query: str, limit: int = 50) -> list[tuple[int, str]]:
+    def fulltext(self, words: list[str], limit: int = 50) -> list[tuple[int, str]]:
         """``(document_id, snippet)`` for an FTS5 query."""
     @abstractmethod
     def count_by_status(self) -> dict[str, int]: ...

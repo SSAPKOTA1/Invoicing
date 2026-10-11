@@ -86,58 +86,58 @@ def assert_final_state(svc, ctx) -> None:
     assert all(n.document_id for n in svc.repos.notices.list())
 
 
-def test_scenario_with_pdf_text_layers(file_svc) -> None:
+def test_scenario_with_pdf_text_layers(svc) -> None:
     files = {"invoice": FIX / "pdf/invoice_RE-2024-001.pdf", "dunning1": FIX / "pdf/dunning1_mueller.pdf",
              "dunning2": FIX / "pdf/dunning2_inkasso.pdf", "payment": FIX / "pdf/payment_confirmation.pdf"}
-    ctx = run_scenario(file_svc, files)
-    assert_final_state(file_svc, ctx)
+    ctx = run_scenario(svc, files)
+    assert_final_state(svc, ctx)
     # importing a file twice does not create a second document
-    again = file_svc.ingest.import_file(files["invoice"])
+    again = svc.ingest.import_file(files["invoice"])
     assert not again.created and again.warnings
 
 
 @needs_ocr
-def test_scenario_with_scanned_images(file_svc) -> None:
+def test_scenario_with_scanned_images(svc) -> None:
     files = {"invoice": FIX / "scans/invoice_RE-2024-001_scan.png", "dunning1": FIX / "pdf/dunning1_mueller.pdf",
              "dunning2": FIX / "scans/dunning2_inkasso_scan.png", "payment": FIX / "scans/payment_confirmation_scan.jpg"}
-    ctx = run_scenario(file_svc, files)
-    assert_final_state(file_svc, ctx)
-    assert file_svc.repos.documents.get(1).text_source == "ocr"
+    ctx = run_scenario(svc, files)
+    assert_final_state(svc, ctx)
+    assert svc.repos.documents.get(1).text_source == "ocr"
 
 
-def test_court_order_after_payment_flags_discrepancy(file_svc) -> None:
+def test_court_order_after_payment_flags_discrepancy(svc) -> None:
     files = {"invoice": FIX / "pdf/invoice_RE-2024-001.pdf", "dunning1": FIX / "pdf/dunning1_mueller.pdf",
              "dunning2": FIX / "pdf/dunning2_inkasso.pdf", "payment": FIX / "pdf/payment_confirmation.pdf"}
-    ctx = run_scenario(file_svc, files)
-    out = file_svc.ingest.import_file(FIX / "pdf/court_order.pdf")
-    rev = file_svc.ingest.build_review(out.document.id)
+    ctx = run_scenario(svc, files)
+    out = svc.ingest.import_file(FIX / "pdf/court_order.pdf")
+    rev = svc.ingest.build_review(out.document.id)
     assert rev.level == DunningLevel.COURT_ORDER and rev.supplier_id == ctx["supplier"].id
     assert rev.new_sender_role == PartyRole.OTHER
-    res = file_svc.ingest.confirm(rev)
+    res = svc.ingest.confirm(rev)
     assert any("Differenz" in d for d in res.discrepancies)
     assert any("Zahlung" in d for d in res.discrepancies)
-    hist = file_svc.history.invoice_history(ctx["invoice_id"])
-    assert hist.warnings and file_svc.dunning.escalated_invoice_ids() == {ctx["invoice_id"]}
+    hist = svc.history.invoice_history(ctx["invoice_id"])
+    assert hist.warnings and svc.dunning.escalated_invoice_ids() == {ctx["invoice_id"]}
 
 
-def test_collection_letter_with_deduction_reconciles(file_svc) -> None:
+def test_collection_letter_with_deduction_reconciles(svc) -> None:
     files = {"invoice": FIX / "pdf/invoice_RE-2024-001.pdf", "dunning1": FIX / "pdf/dunning1_mueller.pdf",
              "dunning2": FIX / "pdf/dunning2_inkasso.pdf", "payment": FIX / "pdf/payment_confirmation.pdf"}
-    ctx = run_scenario(file_svc, files)
-    out = file_svc.ingest.import_file(FIX / "pdf/collection_letter.pdf")
-    rev = file_svc.ingest.build_review(out.document.id)
+    ctx = run_scenario(svc, files)
+    out = svc.ingest.import_file(FIX / "pdf/collection_letter.pdf")
+    rev = svc.ingest.build_review(out.document.id)
     assert rev.level == DunningLevel.COLLECTION and rev.sender_party_id == ctx["agency"].id
     claim = rev.claims[0]
     assert (claim.principal_cents, claim.total_cents, rev.credited_cents) == (60000, 80290, 40000)
-    res = file_svc.ingest.confirm(rev)
+    res = svc.ingest.confirm(rev)
     assert res.discrepancies == []  # 600,00 principal + charges == ledger expectation
-    assert file_svc.ledger.invoice_balance(ctx["invoice_id"]).balance_cents == 80290
-    rows = file_svc.dunning.compare_with_calculation(res.notice_id)
+    assert svc.ledger.invoice_balance(ctx["invoice_id"]).balance_cents == 80290
+    rows = svc.dunning.compare_with_calculation(res.notice_id)
     assert {r.label for r in rows} == {"Verzugszinsen", "Verzugspauschale"}
 
 
-def test_credit_note_and_english_documents(file_svc) -> None:
-    svc = file_svc
+def test_credit_note_and_english_documents(svc) -> None:
+    svc = svc
     inv = svc.ingest.import_file(FIX / "pdf/invoice_RE-2024-001.pdf")
     inv_id = svc.ingest.confirm(svc.ingest.build_review(inv.document.id)).invoice_id
     cn = svc.ingest.import_file(FIX / "pdf/credit_note.pdf")
@@ -153,28 +153,28 @@ def test_credit_note_and_english_documents(file_svc) -> None:
     assert svc.repos.documents.get(en.document.id).review_status == ReviewStatus.REJECTED
 
 
-def test_unreadable_inputs_do_not_crash(file_svc, tmp_path) -> None:
+def test_unreadable_inputs_do_not_crash(svc, tmp_path) -> None:
     corrupt = tmp_path / "kaputt.pdf"
     corrupt.write_bytes(b"%PDF-1.4 this is not really a pdf")
-    out = file_svc.ingest.import_file(corrupt)
+    out = svc.ingest.import_file(corrupt)
     assert out.document is None and "beschädigt" in out.error
     bad_img = tmp_path / "bad.png"
     bad_img.write_bytes(b"\x89PNG garbage")
-    assert "beschädigt" in file_svc.ingest.import_file(bad_img).error
+    assert "beschädigt" in svc.ingest.import_file(bad_img).error
     empty_txt = tmp_path / "leer.txt"
     empty_txt.write_text("  \n", encoding="utf-8")
-    out = file_svc.ingest.import_file(empty_txt)
+    out = svc.ingest.import_file(empty_txt)
     assert out.document and out.document.review_status == ReviewStatus.NEEDS_REVIEW
     assert any("kein text" in w.lower() for w in out.warnings)
-    missing = file_svc.ingest.import_file(tmp_path / "gibt-es-nicht.pdf")
+    missing = svc.ingest.import_file(tmp_path / "gibt-es-nicht.pdf")
     assert missing.error
     exe = tmp_path / "x.exe"
     exe.write_bytes(b"MZ")
-    assert file_svc.ingest.import_file(exe).error
+    assert svc.ingest.import_file(exe).error
     shutil.rmtree(tmp_path, ignore_errors=True)
 
 
-def test_scanned_pdf_falls_back_to_ocr_or_warns(file_svc, tmp_path) -> None:
+def test_scanned_pdf_falls_back_to_ocr_or_warns(svc, tmp_path) -> None:
     """A PDF that contains only an image has no text layer."""
     import pymupdf
     img_pdf = tmp_path / "scan.pdf"
@@ -183,7 +183,7 @@ def test_scanned_pdf_falls_back_to_ocr_or_warns(file_svc, tmp_path) -> None:
     page.insert_image(page.rect, filename=str(FIX / "scans/invoice_RE-2024-001_scan.png"))
     doc.save(img_pdf)
     doc.close()
-    out = file_svc.ingest.import_file(img_pdf)
+    out = svc.ingest.import_file(img_pdf)
     assert out.document is not None
     if HAVE_TESSERACT:
         assert out.document.text_source == "ocr" and "RE-2024/001" in out.document.ocr_text

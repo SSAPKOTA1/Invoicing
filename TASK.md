@@ -66,3 +66,4 @@ Branch: `claude/zen-cannon-x8l4cj` (designated by the environment; stands in for
 - 2026-10-11 Phase 8 (change request): invoice recognition vocabulary (DE/EN/FR/IT/ES/NL), net/vat/gross cross-check, table/PDF layouts, own vocabulary in Settings
 - 2026-10-11 Phase 9 (change request): multi-user mode with PostgreSQL (users/roles/login, live refresh, shared documents, server backup, transfer, concurrency-safe bookings), CI job with PostgreSQL service
 - 2026-10-11 Phase 10 (change request): multi-user without server via shared folder (SQLite rollback journal, daily backups, session heartbeat, transfer)
+- 2026-10-11 Phase 11 (change request "remove SQLite completely, only PostgreSQL"): SQLite engine, local mode, shared-folder mode and PIN removed; native PostgreSQL migrations; one-time importer for old `supplier.db`; connection dialog at first start; CI with PostgreSQL on Windows and Linux; 355 tests, coverage 95 %

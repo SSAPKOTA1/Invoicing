@@ -1,113 +1,108 @@
+"""Schema migrations on PostgreSQL: fresh database, repeated runs, failures, newer schema, ledger protection."""
+
 from __future__ import annotations
 
-import sqlite3
-from pathlib import Path
+import threading
 
 import pytest
 
-from supplier_app.database.connection import Database
+from supplier_app.database.errors import INTEGRITY_ERRORS
 from supplier_app.database.migrations import ALL_MIGRATIONS, LATEST_VERSION, Migration
-from supplier_app.database.migrator import migrate, split_statements
+from supplier_app.database.migrator import migrate
+from supplier_app.database.pg import PgDatabase
 from supplier_app.errors import DatabaseError, MigrationError
 
 
-def tables(path: Path) -> set[str]:
-    con = sqlite3.connect(path)
-    try:
-        return {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type IN ('table','view')")}
-    finally:
-        con.close()
+@pytest.fixture()
+def empty_dsn(pg_template):
+    """An empty database (no schema at all)."""
+    import uuid
+
+    import psycopg
+
+    name = f"t_{uuid.uuid4().hex[:12]}"
+    admin = psycopg.connect(pg_template, autocommit=True)
+    admin.execute(f'CREATE DATABASE "{name}"')
+    yield psycopg.conninfo.make_conninfo(pg_template, dbname=name)
+    admin.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+    admin.close()
 
 
-def test_empty_db_migrates_to_latest(tmp_path: Path) -> None:
-    db_path = tmp_path / "a.db"
-    assert migrate(db_path, tmp_path / "bk") == LATEST_VERSION
-    t = tables(db_path)
-    for name in ("parties", "invoices", "ledger_entries", "documents", "document_references", "document_fts",
-                 "schema_version", "audit_log", "interest_rates", "cases", "dunning_notices", "payments"):
-        assert name in t
-    # idempotent
-    assert migrate(db_path, tmp_path / "bk") == LATEST_VERSION
+def _tables(db: PgDatabase) -> set[str]:
+    return {r[0] for r in db.query_all("SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()")}
 
 
-@pytest.mark.parametrize("start", [m.version for m in ALL_MIGRATIONS[:-1]])
-def test_upgrade_from_every_earlier_version(tmp_path: Path, start: int) -> None:
-    db_path = tmp_path / "b.db"
-    assert migrate(db_path, tmp_path / "bk", target_version=start) == start
-    con = sqlite3.connect(db_path)
-    con.execute("INSERT INTO parties(role,name,name_norm,created_at) VALUES ('supplier','Alt GmbH','alt','2024-01-01')")
-    con.execute(
-        "INSERT INTO documents(stored_path,sha256,original_name,ocr_text,created_at) VALUES ('x',?,?,?,'2024-01-01')",
-        ("a" * 64, "scan.pdf", "Rechnung Testtext"),
-    )
-    con.commit()
-    con.close()
-    assert migrate(db_path, tmp_path / "bk") == LATEST_VERSION
-    with Database(db_path) as db:
-        assert db.scalar("SELECT name FROM parties") == "Alt GmbH"
-        # FTS rebuilt for pre-existing rows
-        assert db.query_all("SELECT rowid FROM document_fts WHERE document_fts MATCH 'Testtext'")
-    assert list((tmp_path / "bk").glob("pre-migration-v*.db"))
+def test_fresh_database_is_migrated_once_and_repeatable(empty_dsn) -> None:
+    with PgDatabase(empty_dsn) as db:
+        assert db.schema_version() == 0
+        assert migrate(db) == LATEST_VERSION
+        names = _tables(db)
+        for expected in ("parties", "invoices", "ledger_entries", "settings", "schema_version", "audit_log", "interest_rates",
+                         "cases", "dunning_notices", "payments", "companies", "hotels", "app_users", "document_files",
+                         "data_version"):
+            assert expected in names
+        assert migrate(db) == LATEST_VERSION  # nothing to do the second time
+        assert [r[0] for r in db.query_all("SELECT version FROM schema_version ORDER BY version")] == list(
+            range(1, LATEST_VERSION + 1))
+        assert db.scalar("SELECT version FROM data_version") == 0
 
 
-def test_failed_migration_rolls_back_and_restores(tmp_path: Path) -> None:
-    db_path = tmp_path / "c.db"
-    migrate(db_path, tmp_path / "bk", target_version=2)
-    bad = Migration(99, "bad", "CREATE TABLE ok_table(x INTEGER); INSERT INTO no_such_table VALUES (1);")
-    with pytest.raises(MigrationError):
-        migrate(db_path, tmp_path / "bk", migrations=[*ALL_MIGRATIONS[:2], bad])
-    assert "ok_table" not in tables(db_path)
-    con = sqlite3.connect(db_path)
-    assert con.execute("SELECT MAX(version) FROM schema_version").fetchone()[0] == 2
-    con.close()
+def test_failing_migration_is_rolled_back_completely(empty_dsn) -> None:
+    with PgDatabase(empty_dsn) as db:
+        migrate(db, ALL_MIGRATIONS[:2])
+        with pytest.raises(MigrationError) as err:
+            migrate(db, [*ALL_MIGRATIONS[:2], Migration(3, "bad", ("CREATE TABLE half_done(x INT)", "THIS IS NOT SQL"))])
+        assert "Version 3" in str(err.value)
+        assert "half_done" not in _tables(db) and db.schema_version() == 2  # PostgreSQL DDL is transactional
+        assert migrate(db) == LATEST_VERSION  # the real migrations still apply afterwards
 
 
-def test_failed_migration_on_fresh_db_leaves_nothing(tmp_path: Path) -> None:
-    db_path = tmp_path / "d.db"
-    bad = Migration(1, "bad", "CREATE TABLE t(x); SELECT * FROM missing_table_zz;")
-    with pytest.raises(MigrationError):
-        migrate(db_path, tmp_path / "bk", migrations=[bad])
-    assert "t" not in tables(db_path)
+def test_database_newer_than_the_program_is_refused(empty_dsn) -> None:
+    with PgDatabase(empty_dsn) as db:
+        migrate(db)
+        db.execute("INSERT INTO schema_version VALUES (999,'future','x')")
+        with pytest.raises(DatabaseError, match="aktualisieren"):
+            migrate(db)
 
 
-def test_newer_database_is_rejected(tmp_path: Path) -> None:
-    db_path = tmp_path / "e.db"
-    migrate(db_path, tmp_path / "bk")
-    con = sqlite3.connect(db_path)
-    con.execute("INSERT INTO schema_version VALUES (999,'future','x')")
-    con.commit()
-    con.close()
-    with pytest.raises(DatabaseError):
-        migrate(db_path, tmp_path / "bk")
+def test_clients_starting_at_once_migrate_exactly_once(empty_dsn) -> None:
+    results: list = []
+
+    def start() -> None:
+        try:
+            with PgDatabase(empty_dsn) as db:
+                results.append(migrate(db))
+        except Exception as exc:  # noqa: BLE001
+            results.append(exc)
+
+    threads = [threading.Thread(target=start) for _ in range(5)]
+    [t.start() for t in threads]
+    [t.join(120) for t in threads]
+    assert results == [LATEST_VERSION] * 5
 
 
-def test_split_statements_keeps_triggers() -> None:
-    sql = "CREATE TABLE a(x); CREATE TRIGGER t BEFORE UPDATE ON a BEGIN SELECT 1; SELECT 2; END; INSERT INTO a VALUES (1);"
-    assert len(split_statements(sql)) == 3
-
-
-def test_ledger_is_append_only(file_storage) -> None:
-    db = file_storage.db
+def test_ledger_is_append_only(storage) -> None:
+    db = storage.db
     pid = db.insert("INSERT INTO parties(role,name,name_norm,created_at) VALUES ('supplier','S','s','2024-01-01')")
     eid = db.insert(
         "INSERT INTO ledger_entries(entry_date,supplier_id,entry_type,category_type,amount_cents,created_at)"
         " VALUES ('2024-01-01',?,'INVOICE','INVOICE',100,'x')", (pid,))
-    with pytest.raises(sqlite3.DatabaseError):
+    with pytest.raises(INTEGRITY_ERRORS):
         db.execute("UPDATE ledger_entries SET amount_cents=5 WHERE id=?", (eid,))
-    with pytest.raises(sqlite3.DatabaseError):
+    with pytest.raises(INTEGRITY_ERRORS):
         db.execute("DELETE FROM ledger_entries WHERE id=?", (eid,))
 
 
-def test_ledger_check_constraints(file_storage) -> None:
-    db = file_storage.db
+def test_ledger_check_constraints(storage) -> None:
+    db = storage.db
     pid = db.insert("INSERT INTO parties(role,name,name_norm,created_at) VALUES ('supplier','S','s','2024-01-01')")
     base = ("INSERT INTO ledger_entries(entry_date,supplier_id,entry_type,category_type,amount_cents,created_at)"
             " VALUES ('2024-01-01',?,?,?,?,'x')")
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(INTEGRITY_ERRORS):
         db.execute(base, (pid, "PAYMENT", "PAYMENT", 100))  # payment must be negative
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(INTEGRITY_ERRORS):
         db.execute(base, (pid, "INVOICE", "INVOICE", 0))
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(INTEGRITY_ERRORS):
         db.execute(base, (pid, "REVERSAL", "INVOICE", -5))  # reversal needs reverses_entry_id
-    with pytest.raises(sqlite3.IntegrityError):
+    with pytest.raises(INTEGRITY_ERRORS):
         db.execute(base, (pid, "BOGUS", "INVOICE", 5))

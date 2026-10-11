@@ -15,14 +15,15 @@ from PySide6.QtWidgets import QApplication  # noqa: E402
 from supplier_app.main import AppContext, build_context  # noqa: E402
 from supplier_app.models.enums import DunningLevel, InvoiceStatus, PartyRole  # noqa: E402
 from supplier_app.selfcheck_ui import check_all_screens, make_window  # noqa: E402
+from supplier_app.settings.connection import ConnectionConfig  # noqa: E402
 from supplier_app.settings.paths import AppPaths  # noqa: E402
 
 FIX = Path(__file__).parent / "fixtures"
 
 
 @pytest.fixture()
-def ctx(tmp_path):
-    c = build_context(AppPaths(tmp_path / "data"))
+def ctx(tmp_path, pg_dsn):
+    c = build_context(AppPaths(tmp_path / "data"), ConnectionConfig(dsn_override=pg_dsn))
     yield c
     c.close()
 
@@ -306,41 +307,9 @@ def test_documents_import_review_and_confirm_workflow(win, demo_ctx, qtbot=None)
 
 
 def test_settings_page_actions(win, demo_ctx, tmp_path, monkeypatch) -> None:
-    from supplier_app.views.dialogs.pin_dialog import ChangePinDialog, UnlockDialog
     app, ctrl, window = win
     window.show_page("settings")
     sp = window.pages["settings"]
-    assert sp.pin_state.text().startswith("Die PIN-Sperre ist ausgeschaltet")
-    pin = demo_ctx.services.pin
-    dlg = ChangePinDialog(pin, "set")
-    dlg.new.setText("1234")
-    dlg.repeat.setText("1235")
-    dlg.accept()
-    assert not dlg.error.isHidden() and not pin.enabled
-    dlg.repeat.setText("1234")
-    dlg.accept()
-    assert pin.enabled
-    sp.refresh()
-    assert sp.btn_change.isEnabled() and window.btn_lock.isHidden() is False or True
-    ch = ChangePinDialog(pin, "change")
-    ch.current.setText("0000")
-    ch.new.setText("5678")
-    ch.repeat.setText("5678")
-    ch.accept()
-    assert not ch.error.isHidden()
-    ch.current.setText("1234")
-    ch.accept()
-    unlock = UnlockDialog(pin)
-    unlock.edit.setText("1111")
-    unlock.accept()
-    assert not unlock.error.isHidden()
-    unlock.edit.setText("5678")
-    unlock.accept()
-    assert unlock.result() == 1
-    off = ChangePinDialog(pin, "disable")
-    off.current.setText("5678")
-    off.accept()
-    assert not pin.enabled
     # interest settings
     sp.margin_b2b.setText("8,5")
     sp.flat_b2b.setText("30,00")
@@ -367,7 +336,6 @@ def test_idle_lock_timer_and_error_dialog(win, monkeypatch) -> None:
     from supplier_app.errors import ValidationError
     from supplier_app.views import errors
     app, ctrl, window = win
-    ctrl.ctx.services.pin.set_pin("4321")
     ctrl.ctx.services.settings.set("idle_lock_minutes", "5")
     ctrl.restart_idle_timer()
     assert ctrl._idle.isActive()
@@ -375,7 +343,7 @@ def test_idle_lock_timer_and_error_dialog(win, monkeypatch) -> None:
     ctrl.lock_requested.connect(lambda: fired.append(1))
     ctrl._idle_timeout()
     assert fired
-    ctrl.ctx.services.pin.reset()
+    ctrl.ctx.services.settings.set("idle_lock_minutes", "0")
     ctrl.restart_idle_timer()
     assert not ctrl._idle.isActive()
     shown = []

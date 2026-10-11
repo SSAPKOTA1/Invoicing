@@ -32,11 +32,9 @@ def safe_name(name: str) -> str:
 
 
 class DocumentService(ServiceBase):
-    def __init__(self, repos: Repositories, paths: AppPaths, *, files_in_database: bool = False) -> None:
+    def __init__(self, repos: Repositories, paths: AppPaths) -> None:
         super().__init__(repos)
-        self.paths = paths
-        #: multi-user mode: the files live in the database, the documents folder is only a local cache
-        self.files_in_database = files_in_database
+        self.paths = paths  # the documents folder is only a local cache: the files live in the database
 
     def store_file(self, source: Path) -> tuple[Document, bool]:
         """Copy ``source`` into the documents folder. Returns ``(document, created)``.
@@ -73,8 +71,7 @@ class DocumentService(ServiceBase):
             with self.repos.transaction():
                 self.repos.documents.add(doc)
                 assert doc.id is not None
-                if self.files_in_database:
-                    self.repos.documents.save_file(doc.id, target.read_bytes())
+                self.repos.documents.save_file(doc.id, target.read_bytes())
                 self._audit("import", "document", doc.id, source.name)
         except DuplicateError:
             target.unlink(missing_ok=True)
@@ -88,9 +85,9 @@ class DocumentService(ServiceBase):
         return doc, True
 
     def file_path(self, doc: Document) -> Path:
-        """Local path of the document file; in multi-user mode it is fetched from the database when not cached yet."""
+        """Local path of the document file; it is fetched from the database when this PC has no copy yet."""
         path = self.paths.documents / doc.stored_path
-        if self.files_in_database and not path.exists() and doc.id is not None:
+        if not path.exists() and doc.id is not None:
             content = self.repos.documents.load_file(doc.id)
             if content is not None:
                 self.paths.documents.mkdir(parents=True, exist_ok=True)

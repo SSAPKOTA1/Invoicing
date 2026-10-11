@@ -28,7 +28,6 @@ from supplier_app.views.dialogs.drill_dialog import DrillDialog
 from supplier_app.views.dialogs.history_dialog import InvoiceHistoryDialog
 from supplier_app.views.dialogs.login_dialog import LoginDialog, PasswordDialog
 from supplier_app.views.dialogs.payment_dialog import PaymentDialog
-from supplier_app.views.dialogs.pin_dialog import UnlockDialog
 from supplier_app.views.dialogs.supplier_dialog import SupplierDialog
 from supplier_app.views.icons import make_icon
 from supplier_app.views.pages.base import Page
@@ -178,20 +177,17 @@ class MainWindow(QMainWindow):
             btn.setIcon(make_icon(key, tk["sidebar_text"] if not btn.isChecked() else tk["accent_text"]))
         self.btn_theme.setIcon(make_icon("theme", tk["muted"]))
         self.btn_lock.setIcon(make_icon("lock", tk["muted"]))
-        self.btn_lock.setVisible(self.ctrl.lock_available)
         self.refresh_user()
 
     def refresh_user(self) -> None:
         """Header: who is logged in (multi-user mode) and a permanent hint for the read-only role."""
         session = self.ctrl.ctx.services.session
-        self.btn_user.setVisible(self.ctrl.multi_user)
-        if self.ctrl.multi_user:
-            self.btn_user.setText(f"👤 {session.label} · {tr(f'role.user.{session.role.value}')}")
+        self.btn_user.setText(f"👤 {session.label} · {tr(f'role.user.{session.role.value}')}")
         if not hasattr(self, "readonly_label"):
             self.readonly_label = QLabel(tr("user.readonly"))
             self.readonly_label.setObjectName("Warning")
             self.statusBar().addPermanentWidget(self.readonly_label)
-        self.readonly_label.setVisible(self.ctrl.multi_user and not session.can_write)
+        self.readonly_label.setVisible(not session.can_write)
 
     def _connect(self) -> None:
         c = self.ctrl
@@ -249,7 +245,6 @@ class MainWindow(QMainWindow):
         current = self.current_key()
         self._dirty = {k for k in self.pages if k != current}
         self.pages[current].refresh()
-        self.btn_lock.setVisible(self.ctrl.lock_available)
         self.ctrl.restart_idle_timer()
 
     def _theme_changed(self, _theme: str) -> None:
@@ -309,19 +304,10 @@ class MainWindow(QMainWindow):
         SupplierDialog(self.ctrl, parent=self).exec()
 
     def lock(self) -> None:
-        """Show the PIN screen (modal). Closing it without the PIN quits the application."""
-        if not self.ctrl.lock_available:
-            return
+        """Lock screen (modal): the password of the logged-in user is needed; closing it quits the application."""
         self.search_popup.hide()
-        if self.ctrl.multi_user:
-            session = self.ctrl.ctx.services.session
-            dlg_login = LoginDialog(self.ctrl.ctx.services.users, fixed_user=session.username, parent=self)
-            if not dlg_login.exec():
-                self.ctrl.app.quit()
-            self.ctrl.restart_idle_timer()
-            return
-        pin = self.ctrl.ctx.services.pin
-        dlg = UnlockDialog(pin, self)
+        session = self.ctrl.ctx.services.session
+        dlg = LoginDialog(self.ctrl.ctx.services.users, fixed_user=session.username, parent=self)
         if not dlg.exec():
             self.ctrl.app.quit()
         self.ctrl.restart_idle_timer()
@@ -342,6 +328,5 @@ class MainWindow(QMainWindow):
             self.ctrl.app.quit()
             return
         self.refresh_user()
-        self.ctrl.register_session()
         self.ctrl.user_changed.emit()
         self.ctrl.notify_changed()

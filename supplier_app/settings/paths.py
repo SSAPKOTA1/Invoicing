@@ -1,4 +1,5 @@
-"""Application data locations (``%APPDATA%/SupplierApp`` on Windows)."""
+"""Local folders of this PC (``%APPDATA%/SupplierApp`` on Windows): logs, exports, preferences, connection settings and the
+cache of document files. The business data itself lives on the PostgreSQL server."""
 
 from __future__ import annotations
 
@@ -13,22 +14,11 @@ from supplier_app import APP_NAME
 
 @dataclass(frozen=True)
 class AppPaths:
-    """``root`` holds the data (database, documents, backups). In the shared-folder mode it is the shared folder and
-    ``local_root`` keeps everything that belongs to this PC (logs, exports, connection settings, preferences)."""
-
     root: Path
-    local_root: Path | None = None
-
-    @property
-    def local(self) -> Path:
-        return self.local_root or self.root
-
-    @property
-    def database(self) -> Path:
-        return self.root / "supplier.db"
 
     @property
     def documents(self) -> Path:
+        """Local cache of the document files (the originals are stored in the database)."""
         return self.root / "documents"
 
     @property
@@ -37,20 +27,20 @@ class AppPaths:
 
     @property
     def logs(self) -> Path:
-        return self.local / "logs"
+        return self.root / "logs"
 
     @property
     def exports(self) -> Path:
-        return self.local / "exports"
+        return self.root / "exports"
 
     def ensure(self) -> AppPaths:
-        for p in (self.root, self.local, self.documents, self.backups, self.logs, self.exports):
+        for p in (self.root, self.documents, self.backups, self.logs, self.exports):
             p.mkdir(parents=True, exist_ok=True)
         return self
 
 
 def default_paths() -> AppPaths:
-    """Data folder; override with env ``SUPPLIERAPP_DATA`` (tests, portable use)."""
+    """Local folder; override with env ``SUPPLIERAPP_DATA`` (tests, portable use)."""
     override = os.environ.get("SUPPLIERAPP_DATA")
     if override:
         return AppPaths(Path(override))
