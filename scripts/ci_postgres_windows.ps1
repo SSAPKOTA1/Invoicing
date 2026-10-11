@@ -13,19 +13,24 @@ $dsn = $null
 # 1. the PostgreSQL that is part of the runner image (service installed, not started)
 $svc = Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($svc) {
-    if ($svc.Status -ne "Running") { Start-Service $svc.Name; Start-Sleep -Seconds 5 }
-    foreach ($pw in $candidates) {
-        $try = "host=127.0.0.1 port=5432 user=postgres password=$pw dbname=postgres"
-        if (Test-Dsn $try) { $dsn = $try; break }
+    try {
+        if ($svc.Status -ne "Running") { Start-Service $svc.Name -ErrorAction Stop; Start-Sleep -Seconds 5 }
+        foreach ($pw in $candidates) {
+            $try = "host=127.0.0.1 port=5432 user=postgres password=$pw dbname=postgres"
+            if (Test-Dsn $try) { $dsn = $try; break }
+        }
+    } catch {
+        Write-Host "The preinstalled PostgreSQL service cannot be started ($($_.Exception.Message)); installing PostgreSQL."
     }
 }
 
 # 2. otherwise install it
 if (-not $dsn) {
     choco install postgresql16 --params "/Password:ci" --no-progress -y
-    Start-Sleep -Seconds 10
     $try = "host=127.0.0.1 port=5432 user=postgres password=ci dbname=postgres"
-    if (Test-Dsn $try) { $dsn = $try }
+    for ($i = 0; $i -lt 12 -and -not $dsn; $i++) {
+        if (Test-Dsn $try) { $dsn = $try } else { Start-Sleep -Seconds 5 }
+    }
 }
 
 if (-not $dsn) { throw "No PostgreSQL server could be reached on this runner." }
