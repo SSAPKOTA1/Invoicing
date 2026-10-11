@@ -1,39 +1,30 @@
-# Makes a PostgreSQL server available on a GitHub Actions Windows runner and exports its connection string
-# (SUPPLIER_TEST_PG_DSN for the tests, SUPPLIERAPP_PG_DSN for the program) to the following steps.
+# Starts a throw-away PostgreSQL server on a GitHub Actions Windows runner (binaries of the runner image, private
+# data folder, trust authentication, port 54329) and exports its connection string to the following steps:
+# SUPPLIER_TEST_PG_DSN for the tests, SUPPLIERAPP_PG_DSN for the program.
 $ErrorActionPreference = "Stop"
 
-function Test-Dsn([string]$dsn) {
-    & python -c "import psycopg,sys; psycopg.connect(sys.argv[1], connect_timeout=5).close()" $dsn 2>$null
-    return ($LASTEXITCODE -eq 0)
+$bin = $null
+if ($env:PGBIN -and (Test-Path (Join-Path $env:PGBIN "initdb.exe"))) { $bin = $env:PGBIN }
+if (-not $bin) {
+    $found = Get-ChildItem "C:\Program Files\PostgreSQL" -Directory -ErrorAction SilentlyContinue |
+        Sort-Object Name -Descending | ForEach-Object { Join-Path $_.FullName "bin" } |
+        Where-Object { Test-Path (Join-Path $_ "initdb.exe") } | Select-Object -First 1
+    if ($found) { $bin = $found }
 }
-
-$candidates = @("root", "postgres", "ci")
-$dsn = $null
-
-# 1. the PostgreSQL that is part of the runner image (service installed, not started)
-$svc = Get-Service -Name "postgresql*" -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($svc) {
-    try {
-        if ($svc.Status -ne "Running") { Start-Service $svc.Name -ErrorAction Stop; Start-Sleep -Seconds 5 }
-        foreach ($pw in $candidates) {
-            $try = "host=127.0.0.1 port=5432 user=postgres password=$pw dbname=postgres"
-            if (Test-Dsn $try) { $dsn = $try; break }
-        }
-    } catch {
-        Write-Host "The preinstalled PostgreSQL service cannot be started ($($_.Exception.Message)); installing PostgreSQL."
-    }
-}
-
-# 2. otherwise install it
-if (-not $dsn) {
+if (-not $bin) {
     choco install postgresql16 --params "/Password:ci" --no-progress -y
-    $try = "host=127.0.0.1 port=5432 user=postgres password=ci dbname=postgres"
-    for ($i = 0; $i -lt 12 -and -not $dsn; $i++) {
-        if (Test-Dsn $try) { $dsn = $try } else { Start-Sleep -Seconds 5 }
-    }
+    $bin = "C:\Program Files\PostgreSQL\16\bin"
 }
+Write-Host "PostgreSQL binaries: $bin"
 
-if (-not $dsn) { throw "No PostgreSQL server could be reached on this runner." }
+$data = Join-Path $env:RUNNER_TEMP "pgdata"
+$log = Join-Path $env:RUNNER_TEMP "pg.log"
+& "$bin\initdb.exe" -D $data -U postgres -A trust -E UTF8 --locale=C
+if ($LASTEXITCODE -ne 0) { throw "initdb failed" }
+& "$bin\pg_ctl.exe" start -D $data -l $log -w -t 60 -o "-p 54329 -c fsync=off -c synchronous_commit=off -c max_connections=200"
+if ($LASTEXITCODE -ne 0) { Get-Content $log -ErrorAction SilentlyContinue; throw "pg_ctl start failed" }
+
+$dsn = "host=127.0.0.1 port=54329 user=postgres dbname=postgres"
 "SUPPLIER_TEST_PG_DSN=$dsn" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 "SUPPLIERAPP_PG_DSN=$dsn" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 Write-Host "PostgreSQL ready."
