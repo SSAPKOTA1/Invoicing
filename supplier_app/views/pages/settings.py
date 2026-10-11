@@ -92,7 +92,9 @@ class SettingsPage(Page):
         self.btn_conn = button(tr("settings.database.change"), "", self.change_connection)
         self.btn_transfer = button(tr("settings.database.transfer"), "", self.transfer_to_server)
         self.btn_transfer_shared = button(tr("settings.database.transfer_shared"), "", self.transfer_to_shared)
+        self.btn_all = button(tr("settings.database.all_pcs"), "", self.save_for_all_pcs)
         row.addWidget(self.btn_conn)
+        row.addWidget(self.btn_all)
         row.addWidget(self.btn_transfer_shared)
         row.addWidget(self.btn_transfer)
         row.addStretch(1)
@@ -292,6 +294,8 @@ class SettingsPage(Page):
             self.db_info.setText(tr("settings.database.local", path=str(self.ctrl.ctx.paths.root)))
         self.btn_conn.setEnabled(admin and not cfg.dsn_override)
         self.demo_card.setVisible(not multi)  # never fill a shared company database with sample data
+        self.btn_all.setVisible(multi and cfg.is_shared)
+        self.btn_all.setEnabled(admin)
         self.btn_transfer.setVisible(not multi)
         self.btn_transfer.setEnabled(admin)
         self.btn_transfer_shared.setVisible(not multi)
@@ -340,6 +344,11 @@ class SettingsPage(Page):
             dlg.result_config.save(self.ctrl.ctx.paths.local, keep_password=dlg.keep_password)
             info(self, tr("settings.database.restart"))
             self.ctrl.app.quit()
+
+    def save_for_all_pcs(self) -> None:
+        path = self.ctrl.run(self.ctrl.ctx.config.save_for_all_pcs, parent=self, notify=False)
+        if path:
+            info(self, tr("settings.database.all_pcs.done", path=str(path)))
 
     def transfer_to_shared(self) -> None:
         """Local data -> empty shared folder; afterwards the application works from that folder."""

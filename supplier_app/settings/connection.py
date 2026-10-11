@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -85,8 +86,10 @@ class ConnectionConfig:
         if env:
             return cls(mode=MODE_SERVER, dsn_override=env)
         path = Path(folder) / FILE_NAME
+        if not path.exists():
+            path = program_config_path()  # settings stored next to the program (shared program folder): same for every PC
         try:
-            if path.exists():
+            if path is not None and path.exists():
                 data = json.loads(path.read_text(encoding="utf-8"))
                 known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__ and k != "dsn_override"}
                 cfg = cls(**known)
@@ -95,6 +98,19 @@ class ConnectionConfig:
         except (OSError, ValueError, TypeError):
             log.warning("connection settings unreadable, using local mode", exc_info=True)
         return cls()
+
+    def save_for_all_pcs(self) -> Path:
+        """Store these settings next to the program, so that every PC that starts it from there is configured."""
+        target = program_config_path()
+        if target.parent.name == "__none__":
+            raise ValidationError("Das Programm läuft nicht aus einem Programmordner (nur im installierten Paket möglich).")
+        if self.is_server:
+            raise ValidationError("Für Server-Verbindungen bitte das Datenbank-Passwort nicht neben dem Programm ablegen.")
+        try:
+            self.save(target.parent, keep_password=False)
+        except OSError as exc:
+            raise ValidationError(f"In den Programmordner kann nicht geschrieben werden: {exc}") from exc
+        return target
 
     def save(self, folder: Path | str, *, keep_password: bool = True) -> None:
         path = Path(folder) / FILE_NAME
@@ -135,6 +151,14 @@ def check_shared_folder(folder: str) -> Path:
     except OSError as exc:
         raise ValidationError(f"In den Ordner '{text}' kann nicht geschrieben werden: {exc}") from exc
     return path
+
+
+def program_config_path() -> Path:
+    """``connection.json`` next to the program (``SupplierApp.exe``). When the program lives in a shared folder, this one file
+    configures every PC; a PC's own setting (saved in its application data folder) always wins."""
+    override = os.environ.get("SUPPLIERAPP_PROGRAM_DIR")
+    base = Path(override) if override else Path(sys.executable).parent if getattr(sys, "frozen", False) else None
+    return (base / FILE_NAME) if base is not None else Path("__none__") / FILE_NAME
 
 
 def test_connection(config: ConnectionConfig) -> str:

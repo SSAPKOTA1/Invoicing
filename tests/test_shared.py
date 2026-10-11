@@ -328,3 +328,23 @@ def test_shared_mode_screens_dialogs_and_start_flow(tmp_path, monkeypatch) -> No
         assert ctx.registry.active() == []  # leaving the program removes the heartbeat
     finally:
         ctx.close()
+
+
+def test_program_folder_configures_every_pc(tmp_path, monkeypatch) -> None:
+    """The program in a shared folder: one connection.json next to it, a PC's own setting still wins."""
+    program = tmp_path / "Programm" / "SupplierApp"
+    program.mkdir(parents=True)
+    shared = tmp_path / "Daten"
+    shared.mkdir()
+    monkeypatch.setenv("SUPPLIERAPP_PROGRAM_DIR", str(program))
+    ConnectionConfig(mode=MODE_SHARED, shared_path=str(shared)).save_for_all_pcs()
+    assert (program / "connection.json").exists()
+    fresh_pc = ConnectionConfig.load(tmp_path / "pc-neu")  # nothing saved on this PC yet
+    assert fresh_pc.is_shared and fresh_pc.shared_path == str(shared)
+    ConnectionConfig().save(tmp_path / "pc-lokal")  # a PC that was set to local on purpose keeps that
+    assert not ConnectionConfig.load(tmp_path / "pc-lokal").is_shared
+    with pytest.raises(ValidationError, match="Passwort"):
+        ConnectionConfig(mode="server", host="x").save_for_all_pcs()
+    monkeypatch.delenv("SUPPLIERAPP_PROGRAM_DIR")
+    with pytest.raises(ValidationError, match="Programmordner"):
+        ConnectionConfig(mode=MODE_SHARED, shared_path=str(shared)).save_for_all_pcs()  # not a packaged program (tests)

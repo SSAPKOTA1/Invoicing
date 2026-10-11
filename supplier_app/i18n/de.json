@@ -539,5 +539,7 @@
  "settings.database.shared.others": "Gerade verbunden: {names}",
  "settings.database.transfer_shared": "Daten in einen gemeinsamen Ordner übertragen …",
  "settings.database.transfer_shared.confirm": "Alle Daten und Dokumente dieses PCs werden in den (leeren) Ordner {path} kopiert. Die lokalen Daten bleiben unverändert erhalten. Danach arbeitet die Anwendung im Mehrbenutzer-Modus mit diesem Ordner (erster Start: Administrator anlegen). Fortfahren?",
- "settings.database.transfer_shared.done": "Die Daten wurden kopiert ({n} Dateien). Die Anwendung wird jetzt beendet; beim nächsten Start melden Sie sich an. Auf den anderen PCs: Einstellungen → Verbindung ändern → gemeinsamer Ordner."
+ "settings.database.transfer_shared.done": "Die Daten wurden kopiert ({n} Dateien). Die Anwendung wird jetzt beendet; beim nächsten Start melden Sie sich an. Auf den anderen PCs: Einstellungen → Verbindung ändern → gemeinsamer Ordner.",
+ "settings.database.all_pcs": "Ordner für alle PCs hinterlegen",
+ "settings.database.all_pcs.done": "Gespeichert in {path}. Jeder PC, der das Programm aus diesem Programmordner startet, verwendet jetzt automatisch den gemeinsamen Daten-Ordner (nur das Anmelden ist noch nötig)."
 }
