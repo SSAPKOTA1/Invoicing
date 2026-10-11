@@ -16,6 +16,7 @@ from supplier_app.models.enums import (
     LedgerEntryType,
     ReviewStatus,
 )
+from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import Repositories
 from supplier_app.services.base import ServiceBase
 from supplier_app.services.dashboard_models import (
@@ -59,8 +60,8 @@ class DashboardService(ServiceBase):
             self._names[supplier_id] = p.name if p else "?"
         return self._names[supplier_id]
 
-    def _rows(self, invoices: list[Invoice], as_of: date, supplier_id: int | None) -> list[Row]:
-        balances = self.repos.ledger.balances_by_invoice(as_of=as_of, supplier_id=supplier_id)
+    def _rows(self, invoices: list[Invoice], as_of: date, supplier_id: int | None, scope: Scope | None = None) -> list[Row]:
+        balances = self.repos.ledger.balances_by_invoice(as_of=as_of, supplier_id=supplier_id, scope=scope)
         return [(inv, balances[inv.id]) for inv in invoices if inv.id in balances]
 
     def _open(self, rows: list[Row]) -> list[Row]:
@@ -108,10 +109,10 @@ class DashboardService(ServiceBase):
     def build(self, flt: DashboardFilter) -> DashboardData:
         self._sums.clear()
         self._open_cache.clear()
-        invoices = self.repos.invoices.list(supplier_id=flt.supplier_id)
-        states = self._rows(invoices, flt.as_of, flt.supplier_id)
+        invoices = self.repos.invoices.list(supplier_id=flt.supplier_id, scope=flt.scope)
+        states = self._rows(invoices, flt.as_of, flt.supplier_id, flt.scope)
         prev = flt.previous()
-        prev_states = self._rows(invoices, prev.as_of, flt.supplier_id)
+        prev_states = self._rows(invoices, prev.as_of, flt.supplier_id, flt.scope)
         data = DashboardData(filter=flt)
         data.empty = self.repos.ledger.count() == 0
 
@@ -133,11 +134,11 @@ class DashboardService(ServiceBase):
         k["charges"] = Kpi("charges", charges, True, self._period_sum(prev, _CHARGE_VALUES), DrillTarget("charges"))
         diffs = self._discrepancies(flt)
         k["claim_diff"] = Kpi("claim_diff", sum(abs(d[1]) for d in diffs), True, None, DrillTarget("discrepancies"))
-        unapplied = self.repos.ledger.unapplied_by_supplier(as_of=flt.as_of)
+        unapplied = self.repos.ledger.unapplied_by_supplier(as_of=flt.as_of, scope=flt.scope)
         credit_unapplied = -sum(v for sid, v in unapplied.items() if flt.supplier_id in (None, sid) and v < 0)
         credits = -money("credits", "", states, flt) + credit_unapplied
         k["credits"] = Kpi("credits", credits, True, None, DrillTarget("credits"), higher_is_worse=False)
-        cases = self.repos.cases.list(supplier_id=flt.supplier_id)
+        cases = self.repos.cases.list(supplier_id=flt.supplier_id, scope=flt.scope)
         active = [c for c in cases if c.status.value in ("open", "waiting", "in_dispute")]
         k["open_cases"] = Kpi("open_cases", len(active), False, None, DrillTarget("cases", "open"))
         escalated = self._escalated_cases(active)
@@ -173,11 +174,11 @@ class DashboardService(ServiceBase):
 
     # -- period sums ----------------------------------------------------------------
     def _period_sum(self, flt: DashboardFilter, types: set[str]) -> int:
-        key = (flt.date_from, flt.date_to, flt.supplier_id)
+        key = (flt.date_from, flt.date_to, flt.supplier_id, flt.scope)
         if key not in self._sums:
             totals: dict[str, int] = defaultdict(int)
             for _b, ctype, total in self.repos.ledger.sums_by_type(
-                    date_from=flt.date_from, date_to=flt.date_to, supplier_id=flt.supplier_id):
+                    date_from=flt.date_from, date_to=flt.date_to, supplier_id=flt.supplier_id, scope=flt.scope):
                 totals[ctype] += total
             self._sums[key] = totals
         return sum(v for t, v in self._sums[key].items() if t in types)
@@ -194,8 +195,8 @@ class DashboardService(ServiceBase):
         months.reverse()
         first = months[0]
         opening = sum(t for _b, _c, t in self.repos.ledger.sums_by_type(
-            date_to=first - timedelta(days=1), supplier_id=flt.supplier_id))
-        rows = self.repos.ledger.sums_by_type(date_from=first, date_to=end, supplier_id=flt.supplier_id,
+            date_to=first - timedelta(days=1), supplier_id=flt.supplier_id, scope=flt.scope))
+        rows = self.repos.ledger.sums_by_type(date_from=first, date_to=end, supplier_id=flt.supplier_id, scope=flt.scope,
                                               month_buckets=True)
         by_month: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
         for bucket, ctype, total in rows:
@@ -213,7 +214,7 @@ class DashboardService(ServiceBase):
     def _discrepancies(self, flt: DashboardFilter) -> list[tuple[int, int, str]]:
         """(notice_id, signed difference, first message) for notices of the period with a difference."""
         out: list[tuple[int, int, str]] = []
-        for n in self.repos.notices.list(supplier_id=flt.supplier_id):
+        for n in self.repos.notices.list(supplier_id=flt.supplier_id, scope=flt.scope):
             if not (flt.date_from <= n.notice_date <= flt.date_to):
                 continue
             assert n.id is not None
@@ -227,7 +228,7 @@ class DashboardService(ServiceBase):
         return [c for c in cases if c.invoice_id and levels.get(c.invoice_id, 0) >= int(DunningLevel.COLLECTION)]
 
     def _review_documents(self, flt: DashboardFilter) -> list:
-        docs = [d for d in self.repos.documents.list() if d.review_status in (ReviewStatus.PENDING, ReviewStatus.NEEDS_REVIEW)]
+        docs = [d for d in self.repos.documents.list(scope=flt.scope) if d.review_status in (ReviewStatus.PENDING, ReviewStatus.NEEDS_REVIEW)]
         if flt.supplier_id is not None:
             docs = [d for d in docs if d.supplier_id in (None, flt.supplier_id)]
         return docs
@@ -242,7 +243,7 @@ class DashboardService(ServiceBase):
             for d in review_docs if d.doc_type in _DUNNING_DOCS][:8]
         deadlines: list[AttentionItem] = []
         latest_deadline: dict[int, date] = {}
-        for n in self.repos.notices.list(supplier_id=flt.supplier_id):
+        for n in self.repos.notices.list(supplier_id=flt.supplier_id, scope=flt.scope):
             if n.new_deadline:
                 for c in n.claims:
                     prev = latest_deadline.get(c.invoice_id)
@@ -286,7 +287,7 @@ class DashboardService(ServiceBase):
     def _unapplied(self, flt: DashboardFilter) -> list:
         from supplier_app.services.payment_service import UnappliedPayment  # local import: avoids a cycle at load
         out: list[UnappliedPayment] = []
-        for e in self.repos.ledger.unapplied_entries(supplier_id=flt.supplier_id, as_of=flt.as_of):
+        for e in self.repos.ledger.unapplied_entries(supplier_id=flt.supplier_id, as_of=flt.as_of, scope=flt.scope):
             pay = self.repos.payments.get(e.payment_id or 0)
             if pay and e.id is not None:
                 out.append(UnappliedPayment(pay, e.id, -e.amount_cents))
@@ -335,11 +336,13 @@ class DashboardService(ServiceBase):
     def drilldown(self, target: DrillTarget, flt: DashboardFilter) -> DrillResult:
         kind, param = target.kind, target.param
         if kind in ("open", "overdue", "due", "aging", "supplier", "forecast", "level"):
-            states = self._rows(self.repos.invoices.list(supplier_id=flt.supplier_id), flt.as_of, flt.supplier_id)
+            states = self._rows(self.repos.invoices.list(supplier_id=flt.supplier_id, scope=flt.scope), flt.as_of, flt.supplier_id,
+                                 flt.scope)
             sel = self._select(kind, param, flt, states)
             return self._invoice_result(self._title(kind, param), sel)
         if kind == "credits":
-            states = self._rows(self.repos.invoices.list(supplier_id=flt.supplier_id), flt.as_of, flt.supplier_id)
+            states = self._rows(self.repos.invoices.list(supplier_id=flt.supplier_id, scope=flt.scope), flt.as_of, flt.supplier_id,
+                                 flt.scope)
             rows = [DrillRow([self._supplier_name(inv.supplier_id), inv.invoice_number,
                               format_date(inv.due_date), format_cents(-bal)], -bal, "invoice", inv.id)
                     for inv, bal in self._select("credits", "", flt, states)]
@@ -363,7 +366,7 @@ class DashboardService(ServiceBase):
             return DrillResult(tr("dash.kpi.claim_diff"), ["Datum", "Stufe", "Lieferant", "Differenz", "Hinweis"], rows,
                                sum(r.amount_cents for r in rows), len(rows))
         if kind == "cases":
-            cases = [c for c in self.repos.cases.list(supplier_id=flt.supplier_id)
+            cases = [c for c in self.repos.cases.list(supplier_id=flt.supplier_id, scope=flt.scope)
                      if c.status.value in ("open", "waiting", "in_dispute")]
             if param == "escalated":
                 cases = self._escalated_cases(cases)
@@ -403,7 +406,7 @@ class DashboardService(ServiceBase):
     def _entries_result(self, kind: str, param: str, flt: DashboardFilter) -> DrillResult:
         wanted = {LedgerEntryType.PAYMENT.value} if kind == "paid" else (
             {param} if param else _CHARGE_VALUES)
-        entries = [e for e in self.repos.ledger.list(supplier_id=flt.supplier_id, date_from=flt.date_from,
+        entries = [e for e in self.repos.ledger.list(supplier_id=flt.supplier_id, scope=flt.scope, date_from=flt.date_from,
                                                      date_to=flt.date_to) if e.category_type.value in wanted]
         sign = -1 if kind == "paid" else 1
         rows = [DrillRow([format_date(e.entry_date), self._supplier_name(e.supplier_id),

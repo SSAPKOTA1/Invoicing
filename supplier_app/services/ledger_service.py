@@ -9,6 +9,7 @@ from datetime import date
 from supplier_app.errors import LedgerError, NotFoundError
 from supplier_app.models.entities import Invoice, LedgerEntry
 from supplier_app.models.enums import AllocationComponent, InvoiceStatus, LedgerEntryType
+from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import Repositories
 from supplier_app.services.base import ServiceBase, today
 from supplier_app.services.ledger import (
@@ -111,17 +112,19 @@ class LedgerService(ServiceBase):
         )
 
     def invoice_states(
-        self, as_of: date | None = None, supplier_id: int | None = None, invoices: list[Invoice] | None = None
+        self, as_of: date | None = None, supplier_id: int | None = None, invoices: list[Invoice] | None = None,
+        scope: Scope | None = None,
     ) -> list[InvoiceState]:
-        """Balances of all invoices that have entries up to ``as_of`` (set-based, fast)."""
+        """Balances of all invoices that have entries up to ``as_of`` (set-based, fast), optionally in a scope."""
         sums: dict[int, dict[LedgerEntryType, int]] = defaultdict(dict)
-        for invoice_id, _sid, ctype, total in self.repos.ledger.sums_by_invoice(as_of=as_of, supplier_id=supplier_id):
+        for invoice_id, _sid, ctype, total in self.repos.ledger.sums_by_invoice(
+                as_of=as_of, supplier_id=supplier_id, scope=scope):
             sums[invoice_id][LedgerEntryType(ctype)] = total
         alloc: dict[int, dict[AllocationComponent, int]] = defaultdict(dict)
-        for invoice_id, comp, total in self.repos.payments.allocation_sums(as_of=as_of):
+        for invoice_id, comp, total in self.repos.payments.allocation_sums(as_of=as_of, scope=scope):
             alloc[invoice_id][AllocationComponent(comp)] = total
         states: list[InvoiceState] = []
-        for invoice in invoices if invoices is not None else self.repos.invoices.list(supplier_id=supplier_id):
+        for invoice in invoices if invoices is not None else self.repos.invoices.list(supplier_id=supplier_id, scope=scope):
             assert invoice.id is not None
             if invoice.id not in sums:
                 continue
@@ -129,26 +132,29 @@ class LedgerService(ServiceBase):
             states.append(InvoiceState(invoice, bal))
         return states
 
-    def supplier_balance(self, supplier_id: int, as_of: date | None = None) -> SupplierBalance:
-        invoices = sum(s.balance.balance_cents for s in self.invoice_states(as_of, supplier_id))
-        unapplied = self.repos.ledger.unapplied_by_supplier(as_of=as_of).get(supplier_id, 0)
+    def supplier_balance(
+        self, supplier_id: int, as_of: date | None = None, scope: Scope | None = None
+    ) -> SupplierBalance:
+        invoices = sum(s.balance.balance_cents for s in self.invoice_states(as_of, supplier_id, scope=scope))
+        unapplied = self.repos.ledger.unapplied_by_supplier(as_of=as_of, scope=scope).get(supplier_id, 0)
         return SupplierBalance(supplier_id, invoices, unapplied, invoices + unapplied)
 
-    def supplier_balances(self, as_of: date | None = None) -> dict[int, SupplierBalance]:
+    def supplier_balances(self, as_of: date | None = None, scope: Scope | None = None) -> dict[int, SupplierBalance]:
         per: dict[int, int] = defaultdict(int)
-        for s in self.invoice_states(as_of):
+        for s in self.invoice_states(as_of, scope=scope):
             per[s.invoice.supplier_id] += s.balance.balance_cents
-        unapplied = self.repos.ledger.unapplied_by_supplier(as_of=as_of)
+        unapplied = self.repos.ledger.unapplied_by_supplier(as_of=as_of, scope=scope)
         return {
             sid: SupplierBalance(sid, per.get(sid, 0), unapplied.get(sid, 0), per.get(sid, 0) + unapplied.get(sid, 0))
             for sid in set(per) | set(unapplied)
         }
 
     def supplier_statement(
-        self, supplier_id: int, date_from: date | None = None, date_to: date | None = None
+        self, supplier_id: int, date_from: date | None = None, date_to: date | None = None,
+        scope: Scope | None = None,
     ) -> SupplierStatement:
-        """Kontoblatt: all entries of the period with running balance."""
-        all_entries = self.repos.ledger.list(supplier_id=supplier_id, date_to=date_to)
+        """Kontoblatt: all entries of the period with running balance (optionally only one company/hotel)."""
+        all_entries = self.repos.ledger.list(supplier_id=supplier_id, date_to=date_to, scope=scope)
         opening = sum(e.amount_cents for e in all_entries if date_from and e.entry_date < date_from)
         period = [e for e in all_entries if not date_from or e.entry_date >= date_from]
         numbers = {i.id: i.invoice_number for i in self.repos.invoices.list(supplier_id=supplier_id)}
@@ -174,10 +180,13 @@ class LedgerService(ServiceBase):
         return OpenItem(invoice_id, invoice.due_date, invoice.invoice_date, bal.open_costs_cents,
                         bal.open_interest_cents, bal.open_principal_cents)
 
-    def aging(self, as_of: date | None = None, supplier_id: int | None = None) -> dict[str, int]:
+    def aging(
+        self, as_of: date | None = None, supplier_id: int | None = None, scope: Scope | None = None
+    ) -> dict[str, int]:
         day = as_of or today()
         return aging_totals(
-            [(s.invoice.due_date, s.balance.balance_cents) for s in self.invoice_states(day, supplier_id)], day
+            [(s.invoice.due_date, s.balance.balance_cents) for s in self.invoice_states(day, supplier_id, scope=scope)],
+            day,
         )
 
     def booked_charges(self, invoice_id: int) -> dict[LedgerEntryType, int]:

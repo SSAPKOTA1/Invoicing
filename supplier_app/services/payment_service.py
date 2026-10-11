@@ -30,6 +30,7 @@ from supplier_app.services.ledger import (
     derive_status,
 )
 from supplier_app.services.ledger_service import LedgerService
+from supplier_app.services.organization_service import OrganizationService
 from supplier_app.services.settings_service import SettingsService
 from supplier_app.util.money import format_cents
 from supplier_app.util.normalize import normalize_iban, normalize_reference
@@ -65,8 +66,12 @@ class UnappliedPayment:
 
 
 class PaymentService(ServiceBase):
-    def __init__(self, repos: Repositories, ledger: LedgerService, cases: CaseService, settings: SettingsService) -> None:
+    def __init__(
+        self, repos: Repositories, ledger: LedgerService, cases: CaseService, settings: SettingsService,
+        organization: OrganizationService | None = None,
+    ) -> None:
         super().__init__(repos)
+        self.organization = organization or OrganizationService(repos)
         self.ledger = ledger
         self.cases = cases
         self.settings = settings
@@ -117,6 +122,8 @@ class PaymentService(ServiceBase):
         iban: str = "",
         notes: str = "",
         document_id: int | None = None,
+        company_id: int | None = None,
+        hotel_id: int | None = None,
     ) -> Payment:
         """Book a payment, distribute it over the invoices; the rest stays as credit on account."""
         if self.repos.parties.get(supplier_id) is None:
@@ -126,11 +133,12 @@ class PaymentService(ServiceBase):
         items = self._open_items(supplier_id, invoice_ids)
         result = allocate_payment(amount_cents, items, rule or self.settings.allocation_rule, manual) if items else \
             AllocationResult([], amount_cents)
+        company_id, hotel_id = self._payment_scope(company_id, hotel_id, [i.invoice_id for i in items])
         with self.repos.transaction():
             payment = self.repos.payments.add(Payment(
                 supplier_id=supplier_id, payment_date=payment_date, amount_cents=amount_cents, method=method,
                 bank_reference=bank_reference.strip(), iban=normalize_iban(iban) if iban else "", notes=notes,
-                document_id=document_id))
+                document_id=document_id, company_id=company_id, hotel_id=hotel_id))
             assert payment.id is not None
             self._book_allocations(payment, result.allocations, result.unallocated_cents, payment_date)
             if bank_reference.strip():
@@ -142,6 +150,21 @@ class PaymentService(ServiceBase):
                             bank_reference.strip(), norm))
             self._audit("create", "payment", payment.id, f"{format_cents(amount_cents)} {payment.bank_reference}".strip())
         return payment
+
+    def _payment_scope(
+        self, company_id: int | None, hotel_id: int | None, invoice_ids: Sequence[int]
+    ) -> tuple[int | None, int | None]:
+        """Explicit choice wins; otherwise inherit what all paid invoices have in common (for unassigned credit)."""
+        if company_id is not None or hotel_id is not None:
+            return self.organization.resolve(company_id, hotel_id)
+        invoices = [self.repos.invoices.get(i) for i in invoice_ids]
+        hotels = {i.hotel_id for i in invoices if i}
+        companies = {i.company_id for i in invoices if i}
+        if len(hotels) == 1 and None not in hotels:
+            return companies.pop(), hotels.pop()
+        if len(companies) == 1 and None not in companies:
+            return companies.pop(), None
+        return None, None
 
     def _book_allocations(
         self, payment: Payment, allocations: Sequence[Allocation], unallocated: int, entry_date: date

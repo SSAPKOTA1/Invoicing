@@ -392,3 +392,255 @@ def test_idle_lock_timer_and_error_dialog(win, monkeypatch) -> None:
     assert not any("secret traceback" in t for t in texts)
     assert ctrl.run(lambda: 1 / 0, parent=None) is None or True
     _ = (InvoiceStatus, Qt, QApplication)
+
+
+# -- companies / hotels (scope) ---------------------------------------------------------------------------
+def test_scope_selector_filters_every_page_and_is_remembered(win, demo_ctx) -> None:
+    from supplier_app.models.scope import ALL, Scope
+    app, ctrl, window = win
+    svc = demo_ctx.services
+    box = window.scope_box
+    assert box.count() == 1 + 2 + 4 and box.itemData(0) == ALL
+    window.show_page("transactions")
+    all_rows = window.pages["transactions"].table.row_count()
+    all_open = window.pages["dashboard"].data.kpis["total_open"].value if window.pages["dashboard"].data else None
+    hotel_idx = next(i for i in range(box.count()) if box.itemData(i).hotel_id is not None)
+    hotel_scope = box.itemData(hotel_idx)
+    box.setCurrentIndex(hotel_idx)
+    window._scope_chosen(hotel_idx)
+    assert ctrl.scope == hotel_scope and svc.settings.get("active_scope") == hotel_scope.key()
+    assert 0 < window.pages["transactions"].table.row_count() < all_rows
+    assert "Seeblick" in window.pages["transactions"].scope_label.text() or "Nordlicht" in window.pages["transactions"].scope_label.text()
+    window.show_page("dashboard")
+    dash = window.pages["dashboard"]
+    assert dash.data.kpis["total_open"].value < all_open and hotel_scope.hotel_id is not None
+    assert dash.scope_label.text() == svc.organization.label(hotel_scope)
+    for key in ("suppliers", "cases", "documents", "reports", "settings"):
+        window.show_page(key)
+    assert window.pages["cases"].table.row_count() < 12
+    # company view contains the hotel view; a restart restores the selection
+    company_scope = Scope(hotel_scope.company_id)
+    ctrl.set_scope(company_scope)
+    assert window.scope_box.currentData() == company_scope
+    window.show_page("transactions")
+    assert window.pages["transactions"].table.row_count() >= 1
+    from supplier_app.controllers.app_controller import AppController
+    again = AppController(demo_ctx, app)
+    assert again.scope == company_scope
+    again.shutdown()
+    # a deleted entry falls back to "everything"
+    svc.settings.set("active_scope", "h:99999")
+    again = AppController(demo_ctx, app)
+    assert again.scope == ALL
+    again.shutdown()
+    ctrl.set_scope(ALL)
+    assert window.scope_box.currentIndex() == 0
+
+
+def test_search_respects_scope(win, demo_ctx) -> None:
+    app, ctrl, window = win
+    org = demo_ctx.services.organization
+    hotel = org.hotels()[0]
+    ctrl.set_scope(org.scope_for(hotel.company_id, hotel.id))
+    popup = window.search_popup
+    window.search_box.setText("RE-")
+    popup.run_search()
+    scoped = popup.results.total
+    ctrl.set_scope(__import__("supplier_app.models.scope", fromlist=["ALL"]).ALL)
+    popup.run_search()
+    assert 0 <= scoped <= popup.results.total
+
+
+def test_settings_manage_companies_and_hotels(win, demo_ctx, monkeypatch) -> None:
+    from PySide6.QtWidgets import QInputDialog
+    app, ctrl, window = win
+    window.show_page("settings")
+    sp = window.pages["settings"]
+    before = sp.org_table.row_count()
+    answers = iter(["Neue Betriebs GmbH", "Hotel Neu", "Hotel Neu 2"])
+    monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: (next(answers), True))
+    sp.add_company()
+    assert sp.org_table.row_count() == before + 1
+    company = next(c for c in demo_ctx.services.organization.companies() if c.name == "Neue Betriebs GmbH")
+    assert any(i for i in range(window.scope_box.count()) if "Neue Betriebs" in window.scope_box.itemText(i))
+    sp.org_table.select_payload(("c", company.id))
+    sp.add_hotel()
+    hotel = demo_ctx.services.organization.hotels(company.id)[0]
+    assert hotel.name == "Hotel Neu"
+    sp.org_table.select_payload(("h", hotel.id))
+    monkeypatch.setattr(QInputDialog, "getText", lambda *a, **k: ("Hotel Umbenannt", True))
+    sp.rename_org()
+    assert demo_ctx.services.organization.hotel(hotel.id).name == "Hotel Umbenannt"
+    monkeypatch.setattr("supplier_app.views.pages.settings.confirm", lambda *a, **k: True)
+    ctrl.set_scope(demo_ctx.services.organization.scope_for(company.id, hotel.id))
+    sp.org_table.select_payload(("h", hotel.id))
+    sp.delete_org()  # empty hotel can be deleted; the active scope falls back to "all"
+    assert not demo_ctx.services.organization.hotels(company.id) and ctrl.scope.is_all
+    # a company with business cannot be deleted: friendly error instead of a crash
+    shown = []
+    monkeypatch.setattr("supplier_app.views.errors.show_error", lambda parent, exc: shown.append(exc))
+    busy = next(c for c in demo_ctx.services.organization.companies() if c.name.startswith("Seeblick"))
+    sp.org_table.select_payload(("c", busy.id))
+    sp.delete_org()
+    assert shown and demo_ctx.services.organization.company(busy.id)
+
+
+def test_due_date_scope_and_deadline_can_be_changed_later(win, demo_ctx, monkeypatch) -> None:
+    from datetime import timedelta
+
+    from supplier_app.views.dialogs.edit_dialogs import DateDialog, ScopeDialog
+    app, ctrl, window = win
+    svc = demo_ctx.services
+    inv = next(i for i in svc.invoices.list() if i.invoice_number == "RE-2025-001")
+    window.show_invoice(inv.id)
+    w = window._history_dialogs[-1].widget
+    new_due = date.today() + timedelta(days=45)
+
+    def fake_date_exec(self) -> int:
+        self.edit.setDate(__import__("PySide6.QtCore", fromlist=["QDate"]).QDate(new_due.year, new_due.month, new_due.day))
+        return 1
+
+    monkeypatch.setattr(DateDialog, "exec", fake_date_exec)
+    w._change_due()
+    assert svc.invoices.get(inv.id).due_date == new_due and format_check(w.subtitle.text(), new_due)
+    # assignment: pick another hotel; the company follows automatically
+    hotel = next(h for h in svc.organization.hotels() if h.id != inv.hotel_id)
+    monkeypatch.setattr(ScopeDialog, "exec", lambda self: (self.picker.set_values(None, hotel.id), 1)[1])
+    w._change_scope()
+    changed = svc.invoices.get(inv.id)
+    assert changed.hotel_id == hotel.id and changed.company_id == hotel.company_id
+    assert hotel.name in w.subtitle.text()
+    # notice deadline: only enabled for notice rows
+    assert not w.actions["deadline"].isEnabled()
+    for r in range(w.table.row_count()):
+        item = w.table.payload_at(r)
+        if item.kind == "notice":
+            w.table.selectRow(r)
+            break
+    assert w.actions["deadline"].isEnabled()
+    notice_id = w.table.selected_payload().notice_id
+    w._change_deadline()
+    notice = svc.dunning.get(notice_id)
+    assert notice.new_deadline == new_due
+    assert any(a.action in ("due_date", "deadline", "assign_scope") for a in svc.repos.audit.list(limit=20))
+
+
+def format_check(text: str, day: date) -> bool:
+    return day.strftime("%d.%m.%Y") in text
+
+
+def test_invoice_dialog_assigns_hotel_and_company(win, demo_ctx) -> None:
+    from decimal import Decimal  # noqa: F401
+
+    from supplier_app.views.dialogs.invoice_dialog import InvoiceDialog
+    app, ctrl, window = win
+    svc = demo_ctx.services
+    hotel = svc.organization.hotels()[0]
+    sup = svc.suppliers.suppliers()[0]
+    dlg = InvoiceDialog(ctrl, sup.id, window)
+    assert dlg.scope.isVisible() or not dlg.isVisible()
+    dlg.scope.set_values(None, hotel.id)
+    assert dlg.scope.company_id == hotel.company_id  # hotel implies its company
+    dlg.number.setText("RE-SCOPE-1")
+    dlg.gross.set_cents(11900)
+    dlg._from_gross()
+    dlg.accept()
+    created = svc.invoices.get(dlg.invoice_id)
+    assert created.hotel_id == hotel.id and created.company_id == hotel.company_id
+    # company only, no hotel
+    dlg2 = InvoiceDialog(ctrl, sup.id, window)
+    dlg2.scope.set_values(hotel.company_id, None)
+    dlg2.number.setText("RE-SCOPE-2")
+    dlg2.gross.set_cents(5000)
+    dlg2._from_gross()
+    dlg2.accept()
+    only_company = svc.invoices.get(dlg2.invoice_id)
+    assert only_company.company_id == hotel.company_id and only_company.hotel_id is None
+
+
+def test_review_form_due_date_shortcuts_and_assignment(win, demo_ctx) -> None:
+    import time
+    app, ctrl, window = win
+    svc = demo_ctx.services
+    window.show_page("documents")
+    page = window.pages["documents"]
+    page.start_import([FIX / "pdf/invoice_RE-2024-001.pdf"])
+    deadline = time.time() + 30
+    while page.importer.busy and time.time() < deadline:
+        app.processEvents()
+        time.sleep(0.02)
+    app.processEvents()
+    doc = next(d for d in svc.repos.documents.list() if d.original_name == "invoice_RE-2024-001.pdf")
+    hotel = svc.organization.hotels()[1]
+    ctrl.set_scope(svc.organization.scope_for(hotel.company_id, hotel.id))
+    page.select_document(doc.id)
+    panel = page.review
+    form = panel.forms["invoice"]
+    assert panel.review.kind == "invoice"
+    assert form.scope.hotel_id == hotel.id  # imported while a hotel is selected -> preassigned
+    base = form.date.date().toPython()
+    form._due_plus(60)
+    from datetime import timedelta
+    assert form.due.date().toPython() == base + timedelta(days=60)
+    form.scope.set_values(hotel.company_id, None)
+    assert form.scope.hotel_id is None
+    panel._collect()
+    assert panel.review.company_id == hotel.company_id and panel.review.hotel_id is None
+    assert panel.review.due_date == base + timedelta(days=60)
+
+
+def test_reports_print_preview_and_pdf(win, demo_ctx, tmp_path, monkeypatch) -> None:
+    from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
+
+    from supplier_app.views.pages import reports as reports_mod
+    app, ctrl, window = win
+    window.show_page("reports")
+    rp = window.pages["reports"]
+    assert not rp.btn_print.isEnabled()  # the Kontoblatt needs a supplier first
+    rp.kind.setCurrentIndex(rp.kind.findData("open_items"))
+    assert rp.btn_print.isEnabled() and rp.btn_preview.isEnabled()
+    pdf = tmp_path / "print.pdf"
+    pages = rp.print_pdf(str(pdf))
+    assert pages >= 1 and pdf.read_bytes().startswith(b"%PDF")
+    # preview dialog renders through the same code path
+    seen = {}
+
+    def fake_preview_exec(self) -> int:
+        printer = QPrinter()
+        printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
+        printer.setOutputFileName(str(tmp_path / "preview.pdf"))
+        self.paintRequested.emit(printer)
+        seen["preview"] = True
+        return 0
+
+    monkeypatch.setattr(QPrintPreviewDialog, "exec", fake_preview_exec)
+    rp.preview()
+    assert seen.get("preview") and (tmp_path / "preview.pdf").exists()
+    # print dialog accepted -> a PDF "printer" receives the report
+    target = tmp_path / "printed.pdf"
+    real_make = reports_mod.make_printer
+
+    def pdf_printer(landscape: bool = True):
+        printer = real_make(landscape)
+        printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
+        printer.setOutputFileName(str(target))
+        return printer
+
+    monkeypatch.setattr(reports_mod, "make_printer", pdf_printer)
+    monkeypatch.setattr(QPrintDialog, "exec", lambda self: 1)
+    rp.print_report()
+    assert target.exists() and target.stat().st_size > 500
+    # the open-items report carries the hotel column and the active scope in the subtitle
+    org = demo_ctx.services.organization
+    hotel = org.hotels()[0]
+    ctrl.set_scope(org.scope_for(hotel.company_id, hotel.id))
+    rp.kind.setCurrentIndex(rp.kind.findData("open_items"))
+    assert rp.report.columns[-1] == "Hotel / Gesellschaft" and hotel.name in rp.report.subtitle
+    assert all(hotel.name in r[-1] for r in rp.report.rows)
+    # nothing to print for the statement without supplier
+    rp.kind.setCurrentIndex(rp.kind.findData("statement"))
+    rp.supplier.setCurrentIndex(0)
+    assert not rp.btn_print.isEnabled()
+    rp.print_report()
+    rp.preview()
+    assert rp.print_pdf(str(tmp_path / "none.pdf")) is None

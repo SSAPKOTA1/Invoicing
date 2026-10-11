@@ -29,6 +29,7 @@ from supplier_app.views.dialogs.forms import button_box, dialog_root, form_layou
 from supplier_app.views.errors import show_error
 from supplier_app.views.widgets.common import button
 from supplier_app.views.widgets.inputs import MoneyEdit, get_date, make_date_edit
+from supplier_app.views.widgets.scope_picker import ScopePicker
 
 COMPONENTS = (AllocationComponent.COSTS, AllocationComponent.INTEREST, AllocationComponent.PRINCIPAL)
 
@@ -71,12 +72,15 @@ class PaymentDialog(QDialog):
         form.addRow(tr("payment.iban"), self.iban)
         form.addRow(tr("common.notes"), self.notes)
         form.addRow(tr("payment.rule"), self.rule)
+        self.scope = ScopePicker(self.svc.organization)
+        self.scope.setToolTip(tr("payment.scope.tip"))
+        form.addRow(tr("org.assignment"), self.scope)
         root.addLayout(form)
 
         root.addWidget(QLabel(tr("payment.invoices")))
-        self.invoice_table = QTableWidget(0, 4)
+        self.invoice_table = QTableWidget(0, 5)
         self.invoice_table.setHorizontalHeaderLabels([tr("payment.col.pay"), tr("invoice.number"), tr("invoice.due"),
-                                                      tr("invoice.open")])
+                                                      tr("invoice.open"), tr("org.hotel_company")])
         self.invoice_table.verticalHeader().setVisible(False)
         self.invoice_table.horizontalHeader().setStretchLastSection(True)
         self.invoice_table.setColumnWidth(0, 60)
@@ -93,7 +97,7 @@ class PaymentDialog(QDialog):
 
         self.manual_box = QGroupBox(tr("payment.manual"))
         self.manual_layout = QVBoxLayout(self.manual_box)
-        self.manual_table = QTableWidget(0, 4)
+        self.manual_table = QTableWidget(0, 5)
         self.manual_table.setHorizontalHeaderLabels([tr("invoice.number"), tr("component.costs"),
                                                      tr("component.interest"), tr("component.principal")])
         self.manual_table.verticalHeader().setVisible(False)
@@ -144,7 +148,8 @@ class PaymentDialog(QDialog):
             chk.setCheckState(Qt.CheckState.Checked if s.invoice.id == preselect else Qt.CheckState.Unchecked)
             self.invoice_table.setItem(r, 0, chk)
             for c, text in enumerate((s.invoice.invoice_number, format_date(s.invoice.due_date),
-                                      format_cents(s.balance.balance_cents)), start=1):
+                                      format_cents(s.balance.balance_cents),
+                                      self.svc.organization.item_label(s.invoice.company_id, s.invoice.hotel_id)), start=1):
                 it = QTableWidgetItem(text)
                 it.setFlags(Qt.ItemFlag.ItemIsEnabled)
                 if c == 3:
@@ -248,7 +253,7 @@ class PaymentDialog(QDialog):
                 sid, get_date(self.date), amount, self.selected_invoice_ids(), rule=rule,
                 manual=self._manual_values() if rule == AllocationRule.MANUAL else None,
                 method=PaymentMethod(self.method.currentData()), bank_reference=self.reference.text(), iban=self.iban.text(),
-                notes=self.notes.text())
+                notes=self.notes.text(), company_id=self.scope.company_id, hotel_id=self.scope.hotel_id)
         except SupplierAppError as exc:
             self.error.setText(exc.message)
             self.error.setVisible(True)

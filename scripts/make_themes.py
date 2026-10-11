@@ -39,6 +39,7 @@ QLabel#KpiDelta[tone="bad"] { color: %(danger)s; }
 QLabel#SectionTitle { font-size: 11pt; font-weight: 600; }
 QLabel#PageTitle { font-size: 16pt; font-weight: 700; }
 QLabel#Muted, QLabel[muted="true"] { color: %(muted)s; }
+QLabel#ScopeBadge { padding: 3px 12px; border-radius: 11px; background: %(accent)s; color: %(accent_text)s; font-size: 9pt; font-weight: 600; }
 QLabel#Badge { padding: 2px 10px; border-radius: 10px; background: %(surface3)s; font-size: 9pt; font-weight: 600; }
 QLabel#Badge[tone="ok"] { background: %(ok_bg)s; color: %(ok)s; }
 QLabel#Badge[tone="warn"] { background: %(warn_bg)s; color: %(warn)s; }

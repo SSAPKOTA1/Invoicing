@@ -73,14 +73,26 @@ class DemoDataService:
         gruenwald = supplier("Grünwald Maschinenbau GmbH")
         ink_schmidt = agency("Inkasso Schmidt & Partner GmbH", mueller)
         ink_nord = agency("Creditreform Nord Inkasso GmbH", nordwind)
+        org = svc.organization
+        seeblick = org.create_company("Seeblick Hotels GmbH")
+        nordlicht = org.create_company("Nordlicht Hospitality AG")
+        h_see = org.create_hotel(seeblick.id, "Hotel Seeblick")
+        h_berg = org.create_hotel(seeblick.id, "Hotel Bergfried")
+        h_nord = org.create_hotel(nordlicht.id, "Hotel Nordlicht")
+        h_strand = org.create_hotel(nordlicht.id, "Strandhotel Möwe")
+        #: rotation: four hotels and two invoices that belong to a company only
+        scopes = [(seeblick.id, h_see.id), (seeblick.id, h_berg.id), (seeblick.id, None), (nordlicht.id, h_nord.id),
+                  (nordlicht.id, h_strand.id), (nordlicht.id, None)]
         n_invoices = n_notices = n_payments = 0
         tmp = Path(tempfile.mkdtemp(prefix="supplierapp-demo-"))
 
         def invoice(sup: Party, number: str, days_ago: int, gross: int, terms: int = 30) -> int:
             nonlocal n_invoices
+            company_id, hotel_id = scopes[n_invoices % len(scopes)]
             n_invoices += 1
             inv = svc.invoices.create_invoice(sup.id, number, ago(days_ago), gross_cents=gross,
-                                              due_date=ago(days_ago) + timedelta(days=terms))
+                                              due_date=ago(days_ago) + timedelta(days=terms),
+                                              company_id=company_id, hotel_id=hotel_id)
             return inv.id
 
         def pay(sup: Party, days_ago: int, amount: int, invoice_ids: list[int], ref: str = ""):
@@ -100,6 +112,8 @@ class DemoDataService:
                  *[f"{lbl}: {v}" for lbl, v in (refs or [])]], tmp, f"brief-{inv_id}-{days_ago}", int(level))
             doc.review_status = ReviewStatus.ACCEPTED
             svc.repos.documents.update(doc)
+            inv_row = svc.repos.invoices.get(inv_id)
+            svc.repos.documents.set_scope(doc.id, inv_row.company_id, inv_row.hotel_id)
             svc.dunning.book_notice(NoticeDraft(
                 sender_party_id=sender.id, supplier_id=sup.id, notice_date=ago(days_ago), level=level,
                 claims=[NoticeClaim(inv_id, principal, fees, interest, flat, other, total)],

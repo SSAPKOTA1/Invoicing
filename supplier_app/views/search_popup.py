@@ -15,9 +15,10 @@ class SearchPopup(QFrame):
 
     hit_chosen = Signal(object)
 
-    def __init__(self, parent: QWidget, search: SearchService, box: QLineEdit) -> None:
+    def __init__(self, parent: QWidget, search: SearchService, box: QLineEdit, scope_provider=None) -> None:
         super().__init__(parent)
         self.search_service = search
+        self._scope_provider = scope_provider
         self.box = box
         self.setObjectName("Card")
         self.setVisible(False)
@@ -47,7 +48,7 @@ class SearchPopup(QFrame):
             self.hide()
             return
         try:
-            self.results = self.search_service.search(text)
+            self.results = self.search_service.search(text, scope=self._scope_provider() if self._scope_provider else None)
         except SupplierAppError as exc:
             self.results = None
             self.info.setText(exc.message)

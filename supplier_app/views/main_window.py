@@ -6,6 +6,7 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QButtonGroup,
+    QComboBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -71,7 +72,7 @@ class MainWindow(QMainWindow):
             self.pages[page.key] = page
             self.stack.addWidget(page)
         self.setStatusBar(QStatusBar())
-        self.search_popup = SearchPopup(central, ctrl.ctx.services.search, self.search_box)
+        self.search_popup = SearchPopup(central, ctrl.ctx.services.search, self.search_box, lambda: self.ctrl.scope)
         self.search_popup.hit_chosen.connect(self._open_hit)
         self._connect()
         self._shortcuts()
@@ -117,6 +118,16 @@ class MainWindow(QMainWindow):
         self.search_box.setClearButtonEnabled(True)
         lay.addWidget(self.search_box)
         lay.addStretch(1)
+        scope_label = QLabel(tr("org.scope"))
+        scope_label.setObjectName("Muted")
+        lay.addWidget(scope_label)
+        self.scope_box = QComboBox()
+        self.scope_box.setObjectName("ScopeBox")
+        self.scope_box.setMinimumWidth(260)
+        self.scope_box.setToolTip(tr("org.scope.tooltip"))
+        self.scope_box.activated.connect(self._scope_chosen)
+        lay.addWidget(self.scope_box)
+        self.reload_scope_choices()
         self.btn_import = QPushButton(tr("action.import"))
         self.btn_import.setProperty("kind", "primary")
         self.btn_import.clicked.connect(self.start_import)
@@ -132,6 +143,24 @@ class MainWindow(QMainWindow):
             lay.addWidget(b)
         return header
 
+    def reload_scope_choices(self) -> None:
+        """Fill the Gesellschaft/Hotel selector (all / company / hotel) and select the active scope."""
+        org = self.ctrl.ctx.services.organization
+        self.scope_box.blockSignals(True)
+        self.scope_box.clear()
+        for choice in org.choices():
+            text = ("      " if choice.level == 2 else "") + choice.label
+            if choice.level == 1:
+                text = "▸ " + text
+            self.scope_box.addItem(text, choice.scope)
+        idx = next((i for i in range(self.scope_box.count()) if self.scope_box.itemData(i) == self.ctrl.scope), 0)
+        self.scope_box.setCurrentIndex(idx)
+        self.scope_box.setEnabled(self.scope_box.count() > 1)
+        self.scope_box.blockSignals(False)
+
+    def _scope_chosen(self, index: int) -> None:
+        self.ctrl.set_scope(self.scope_box.itemData(index))
+
     def apply_theme_icons(self) -> None:
         tk = tokens(self.ctrl.theme)
         for key, btn in self.nav_buttons.items():
@@ -144,6 +173,7 @@ class MainWindow(QMainWindow):
         c = self.ctrl
         c.data_changed.connect(self._data_changed)
         c.theme_changed.connect(self._theme_changed)
+        c.scope_changed.connect(lambda _s: self.reload_scope_choices())
         c.navigate.connect(self.show_page)
         c.open_invoice.connect(self.show_invoice)
         c.open_supplier.connect(self.show_supplier)

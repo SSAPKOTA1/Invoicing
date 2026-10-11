@@ -43,6 +43,9 @@ class SuppliersPage(Page):
         root.setContentsMargins(24, 20, 24, 20)
         head = QHBoxLayout()
         head.addWidget(page_title(tr("nav.suppliers")))
+        self.scope_label = QLabel()
+        self.scope_label.setObjectName("ScopeBadge")
+        head.addWidget(self.scope_label)
         head.addStretch(1)
         head.addWidget(button(tr("supplier.new"), "primary", self.new_supplier))
         root.addLayout(head)
@@ -136,7 +139,9 @@ class SuppliersPage(Page):
     # -- data -----------------------------------------------------------------------------------------------
     def refresh(self) -> None:
         svc = self.svc
-        states = svc.ledger.invoice_states()
+        scope = self.ctrl.scope
+        self.scope_label.setText(svc.organization.label(scope))
+        states = svc.ledger.invoice_states(scope=scope)
         today = date.today()
         open_by: dict[int, int] = {}
         overdue_by: dict[int, int] = {}
@@ -146,9 +151,12 @@ class SuppliersPage(Page):
                 open_by[sid] = open_by.get(sid, 0) + s.balance.balance_cents
                 if s.invoice.due_date and s.invoice.due_date < today:
                     overdue_by[sid] = overdue_by.get(sid, 0) + s.balance.balance_cents
-        balances = svc.ledger.supplier_balances()
+        balances = svc.ledger.supplier_balances(scope=scope)
+        active = {s.invoice.supplier_id for s in states} | set(balances)
         rows = []
         for p in svc.suppliers.list():
+            if not scope.is_all and p.id not in active and p.id != self.supplier_id:
+                continue  # only suppliers that have business in the selected company / hotel
             bal = balances.get(p.id or 0)
             credit = -(bal.total_cents) if bal and bal.total_cents < 0 else 0
             rows.append(Row([p.name, tr(f"role.{p.role.value}"),
@@ -192,7 +200,7 @@ class SuppliersPage(Page):
             return
         svc = self.svc
         party = svc.suppliers.get(sid)
-        bal = svc.ledger.supplier_balance(sid)
+        bal = svc.ledger.supplier_balance(sid, scope=self.ctrl.scope)
         self.header.setText(f"{party.name} · {tr('suppliers.balance')}: {format_cents(bal.total_cents)}")
         self.btn_invoice.setEnabled(party.role.value != "collection_agency")
         self.btn_pay.setEnabled(party.role.value != "collection_agency")
@@ -206,8 +214,9 @@ class SuppliersPage(Page):
         svc = self.svc
         d_from = get_date(self.from_edit) if self.use_period.isChecked() else None
         d_to = get_date(self.to_edit) if self.use_period.isChecked() else None
-        st = svc.ledger.supplier_statement(sid, d_from, d_to)
-        open_ids = {s.invoice.id for s in svc.ledger.invoice_states(supplier_id=sid)
+        scope = self.ctrl.scope
+        st = svc.ledger.supplier_statement(sid, d_from, d_to, scope=scope)
+        open_ids = {s.invoice.id for s in svc.ledger.invoice_states(supplier_id=sid, scope=scope)
                     if s.balance.balance_cents > 0 and s.invoice.status != InvoiceStatus.CANCELLED}
         rows: list[Row] = []
         debit = credit = 0
@@ -235,13 +244,13 @@ class SuppliersPage(Page):
         self.totals.setText(
             f"<b>{tr('suppliers.total_debit')}:</b> {format_cents(debit)} &nbsp; <b>{tr('suppliers.total_paid')}:</b> "
             f"{format_cents(credit)} &nbsp; <b>{tr('suppliers.closing')}:</b> {format_cents(st.closing_cents)}")
-        aging = svc.ledger.aging(supplier_id=sid)
+        aging = svc.ledger.aging(supplier_id=sid, scope=scope)
         self.aging_label.setText("<span style='color:gray'>" + tr("dash.chart.aging") + ":</span> " + " &nbsp;·&nbsp; ".join(
             f"{tr('aging.' + b)}: <b>{format_cents(aging[b])}</b>" for b in AGING_BUCKETS))
 
     def _load_invoices(self, sid: int) -> None:
         rows = []
-        for s in sorted(self.svc.ledger.invoice_states(supplier_id=sid), key=lambda s: s.invoice.invoice_date, reverse=True):
+        for s in sorted(self.svc.ledger.invoice_states(supplier_id=sid, scope=self.ctrl.scope), key=lambda s: s.invoice.invoice_date, reverse=True):
             b, inv = s.balance, s.invoice
             overdue = b.balance_cents > 0 and inv.due_date is not None and inv.due_date < date.today()
             rows.append(Row([inv.invoice_number, Cell(format_date(inv.invoice_date), inv.invoice_date.toordinal()),
@@ -260,7 +269,7 @@ class SuppliersPage(Page):
     def _load_notices(self, sid: int) -> None:
         svc = self.svc
         rows = []
-        for n in svc.dunning.list(supplier_id=sid):
+        for n in svc.dunning.list(supplier_id=sid, scope=self.ctrl.scope):
             rec = svc.dunning.reconcile(n.id or 0)
             sender = svc.repos.parties.get(n.sender_party_id)
             numbers = ", ".join(svc.invoices.get(c.invoice_id).invoice_number for c in n.claims)
@@ -276,7 +285,7 @@ class SuppliersPage(Page):
 
     def _load_documents(self, sid: int) -> None:
         rows = [Row([d.original_name, tr(f"doctype.{d.doc_type.value}"), f"{int(d.confidence * 100)} %",
-                     tr(f"review.{d.review_status.value}")], d.id) for d in self.svc.repos.documents.list(supplier_id=sid)]
+                     tr(f"review.{d.review_status.value}")], d.id) for d in self.svc.repos.documents.list(supplier_id=sid, scope=self.ctrl.scope)]
         self.documents.set_data([tr("doc.name"), tr("doc.type"), tr("doc.confidence"), tr("doc.status")], rows, [320, 160, 90, 120])
 
     def _load_master(self, sid: int) -> None:

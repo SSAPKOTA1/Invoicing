@@ -14,6 +14,7 @@ from supplier_app.services.history_service import HistoryService
 from supplier_app.services.ingest_service import IngestService, make_text_extractor
 from supplier_app.services.invoice_service import InvoiceService
 from supplier_app.services.ledger_service import LedgerService
+from supplier_app.services.organization_service import OrganizationService
 from supplier_app.services.payment_service import PaymentService
 from supplier_app.services.pin_service import PinService
 from supplier_app.services.search_service import SearchService
@@ -37,6 +38,7 @@ class Services:
     documents: DocumentService
     backup: BackupService
     ingest: IngestService
+    organization: OrganizationService
 
 
 def build_services(storage: Storage) -> Services:
@@ -67,4 +69,5 @@ def build_services(storage: Storage) -> Services:
         documents=documents,
         backup=BackupService(storage.db, storage.paths),
         ingest=ingest,
+        organization=OrganizationService(repos),
     )

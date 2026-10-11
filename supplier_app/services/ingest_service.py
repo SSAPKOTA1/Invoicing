@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -29,6 +30,7 @@ from supplier_app.services.dunning_service import DunningService, NoticeDraft
 from supplier_app.services.invoice_service import InvoiceService
 from supplier_app.services.ledger import NoticeClaim
 from supplier_app.services.ledger_service import LedgerService
+from supplier_app.services.organization_service import OrganizationService
 from supplier_app.services.payment_service import PaymentService
 from supplier_app.services.review_models import (
     KIND_CREDIT,
@@ -75,9 +77,10 @@ class IngestService(ServiceBase):
     def __init__(
         self, repos: Repositories, documents: DocumentService, extractor: TextExtractor, settings: SettingsService,
         ledger: LedgerService, suppliers: SupplierService, invoices: InvoiceService, payments: PaymentService,
-        dunning: DunningService,
+        dunning: DunningService, organization: OrganizationService | None = None,
     ) -> None:
         super().__init__(repos)
+        self.organization = organization or OrganizationService(repos)
         self.documents, self.extractor, self.settings, self.ledger = documents, extractor, settings, ledger
         self.suppliers, self.invoices, self.payments, self.dunning = suppliers, invoices, payments, dunning
 
@@ -182,6 +185,8 @@ class IngestService(ServiceBase):
         due = f.due_date or f.deadline
         review.due_date = due.value if due else None
         self._copy(review, "due_date", due)
+        review.company_id, review.hotel_id = (doc.company_id, doc.hotel_id) if doc.company_id else \
+            self.organization.detect_in_text(doc.ocr_text)
         review.sender_ibans = [str(i.value) for i in f.ibans if i.confidence >= 0.9]
         review.sender_vat_ids = [str(v.value) for v in f.vat_ids]
         review.references = [(r.ref_type, r.raw) for r in f.references]
@@ -190,6 +195,12 @@ class IngestService(ServiceBase):
         if f.invoice_numbers:
             review.invoice_number = str(f.invoice_numbers[0].value)
             self._copy(review, "invoice_number", f.invoice_numbers[0])
+        if review.kind == KIND_INVOICE and review.due_date is None and review.document_date is not None:
+            days = self.settings.default_payment_days
+            review.due_date = review.document_date + timedelta(days=days)
+            review.confidence["due_date"] = 0.3
+            review.messages.append(
+                f"Kein Fälligkeitsdatum erkannt – Vorschlag: Rechnungsdatum + {days} Tage. Bitte prüfen oder ändern.")
         if review.kind in (KIND_INVOICE, KIND_CREDIT):
             review.net_cents, review.vat_cents, review.gross_cents = f.amount("net"), f.amount("vat"), f.amount("gross")
             for key in ("net", "vat", "gross"):
@@ -275,10 +286,19 @@ class IngestService(ServiceBase):
                 raise ValidationError("Unbekannte Buchungsart.")
             doc.doc_type = review.doc_type
             doc.supplier_id = review.supplier_id
+            doc.company_id, doc.hotel_id = self._document_scope(review, result)
             doc.review_status = ReviewStatus.ACCEPTED
             self.repos.documents.update(doc)
             self._audit("confirm", "document", doc.id, review.kind)
         return result
+
+    def _document_scope(self, review: ReviewData, result: ConfirmResult) -> tuple[int | None, int | None]:
+        """Scope of the document: that of the booked invoice, else the one chosen in the form."""
+        if result.invoice_id is not None:
+            inv = self.repos.invoices.get(result.invoice_id)
+            if inv is not None and inv.company_id is not None:
+                return inv.company_id, inv.hotel_id
+        return self.organization.resolve(review.company_id, review.hotel_id)
 
     def reject(self, doc_id: int) -> None:
         self.documents.set_review_status(doc_id, ReviewStatus.REJECTED)
@@ -321,7 +341,8 @@ class IngestService(ServiceBase):
             supplier_id, review.invoice_number, review.document_date, gross_cents=review.gross_cents,
             net_cents=review.net_cents, vat_cents=review.vat_cents, vat_rate=review.vat_rate,
             due_date=review.due_date, document_id=review.document_id,
-            references=[(t, v) for t, v in review.references if t != ReferenceType.INVOICE_NUMBER])
+            references=[(t, v) for t, v in review.references if t != ReferenceType.INVOICE_NUMBER],
+            company_id=review.company_id, hotel_id=review.hotel_id)
         assert invoice.id is not None
         result.invoice_id = invoice.id
         for ref_type, raw in review.references:
@@ -374,7 +395,8 @@ class IngestService(ServiceBase):
             raise ValidationError("Für eine Zahlung werden Lieferant, Betrag und Datum benötigt.")
         payment = self.payments.record_payment(
             review.supplier_id, review.document_date, review.payment_amount_cents, review.payment_invoice_ids,
-            method=review.method, bank_reference=review.bank_reference, iban=review.iban, document_id=review.document_id)
+            method=review.method, bank_reference=review.bank_reference, iban=review.iban, document_id=review.document_id,
+            company_id=review.company_id, hotel_id=review.hotel_id)
         result.payment_id = payment.id
         if review.payment_invoice_ids:
             result.invoice_id = review.payment_invoice_ids[0]

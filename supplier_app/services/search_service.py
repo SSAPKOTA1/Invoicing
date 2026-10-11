@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from supplier_app.errors import ValidationError
 from supplier_app.i18n import tr
+from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import Repositories
 from supplier_app.repositories.sqlite_documents import fts_query_from_text
 from supplier_app.services.base import ServiceBase
@@ -47,7 +48,7 @@ class SearchService(ServiceBase):
     def __init__(self, repos: Repositories) -> None:
         super().__init__(repos)
 
-    def search(self, query: str, limit: int = 50) -> SearchResults:
+    def search(self, query: str, limit: int = 50, scope: Scope | None = None) -> SearchResults:
         q = query.strip()
         res = SearchResults(query=q)
         if not q:
@@ -130,8 +131,39 @@ class SearchService(ServiceBase):
             if case and case.id:
                 case_reasons.setdefault(case.id, invoice_reasons[inv_id])
 
+        if scope is not None and not scope.is_all:
+            self._restrict(scope, supplier_reasons, invoice_reasons, case_reasons, doc_hits)
         self._fill(res, supplier_reasons, invoice_reasons, case_reasons, doc_hits, limit)
         return res
+
+    def _restrict(
+        self, scope: Scope, suppliers: dict[int, str], invoices: dict[int, str], cases: dict[int, str],
+        docs: dict[int, SearchHit],
+    ) -> None:
+        """Keep only hits that belong to the company/hotel (documents not yet assigned stay visible)."""
+        def inv_ok(invoice_id: int) -> bool:
+            inv = self.repos.invoices.get(invoice_id)
+            if inv is None:
+                return False
+            return inv.hotel_id == scope.hotel_id if scope.hotel_id is not None else inv.company_id == scope.company_id
+
+        for iid in [i for i in invoices if not inv_ok(i)]:
+            del invoices[iid]
+        for cid in list(cases):
+            case = self.repos.cases.get(cid)
+            if case is None or case.invoice_id is None or not inv_ok(case.invoice_id):
+                del cases[cid]
+        for sid in list(suppliers):
+            if not self.repos.invoices.list(supplier_id=sid, scope=scope):
+                del suppliers[sid]
+        for did in list(docs):
+            doc = self.repos.documents.get(did)
+            if doc is None:
+                del docs[did]
+                continue
+            matches = doc.hotel_id == scope.hotel_id if scope.hotel_id is not None else doc.company_id == scope.company_id
+            if not (matches or doc.company_id is None):
+                del docs[did]
 
     def _fill(
         self, res: SearchResults, suppliers: dict[int, str], invoices: dict[int, str], cases: dict[int, str],

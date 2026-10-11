@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QSpinBox,
@@ -47,7 +48,7 @@ class SettingsPage(Page):
         root.setContentsMargins(24, 20, 24, 24)
         root.setSpacing(14)
         root.addWidget(page_title(tr("nav.settings")))
-        for builder in (self._appearance, self._security, self._paths, self._tesseract, self._interest, self._allocation,
+        for builder in (self._appearance, self._organization, self._security, self._paths, self._tesseract, self._interest, self._allocation,
                         self._references, self._backup, self._demo):
             root.addWidget(builder())
         root.addStretch(1)
@@ -60,6 +61,21 @@ class SettingsPage(Page):
         self.theme.addItem(tr("settings.theme.light"), "light")
         self.theme.activated.connect(lambda _i: self.ctrl.set_theme(self.theme.currentData()))
         card.add(self.theme)
+        return card
+
+    def _organization(self) -> Card:
+        card = Card(tr("org.title"))
+        card.add(muted(tr("org.hint")))
+        self.org_table = DataTable(sortable=False)
+        self.org_table.setMaximumHeight(230)
+        card.add(self.org_table)
+        row = QHBoxLayout()
+        row.addWidget(button(tr("org.add_company"), "primary", self.add_company))
+        row.addWidget(button(tr("org.add_hotel"), "", self.add_hotel))
+        row.addWidget(button(tr("org.rename"), "", self.rename_org))
+        row.addWidget(button(tr("common.delete"), "danger", self.delete_org))
+        row.addStretch(1)
+        card.layout_.addLayout(row)
         return card
 
     def _security(self) -> Card:
@@ -212,8 +228,71 @@ class SettingsPage(Page):
         for t, edit in self.ref_edits.items():
             edit.setText(", ".join(rules.get(t.value, [])))
         self._fill_rates()
+        self._fill_organization()
         if not self.tess_info.text():
             self.check_tesseract()
+
+    def _fill_organization(self) -> None:
+        org = self.svc.organization
+        rows = []
+        for company in org.companies():
+            rows.append(Row([Cell(company.name, tone="muted"), tr("org.company"),
+                             str(len(org.hotels(company.id)))], ("c", company.id)))
+            for hotel in org.hotels(company.id):
+                rows.append(Row([Cell("      " + hotel.name), tr("org.hotel"), ""], ("h", hotel.id)))
+        self.org_table.set_data([tr("org.name"), tr("org.kind"), tr("org.hotel_count")], rows, [320, 140, 100])
+
+    def _ask_name(self, title: str, text: str = "") -> str:
+        name, ok = QInputDialog.getText(self, title, tr("org.name"), text=text)
+        return name.strip() if ok else ""
+
+    def _org_changed(self) -> None:
+        self.ctrl.reload_scope()
+        self.ctrl.notify_changed()
+
+    def add_company(self) -> None:
+        name = self._ask_name(tr("org.add_company"))
+        if name and self.ctrl.run(self.svc.organization.create_company, name, parent=self, notify=False):
+            self._org_changed()
+
+    def _selected_org(self) -> tuple[str, int] | None:
+        payload = self.org_table.selected_payload()
+        return payload if payload else None
+
+    def add_hotel(self) -> None:
+        sel = self._selected_org()
+        if sel is None:
+            info(self, tr("org.select_company"))
+            return
+        kind, ident = sel
+        company_id = ident if kind == "c" else self.svc.organization.hotel(ident).company_id
+        name = self._ask_name(tr("org.add_hotel"))
+        if name and self.ctrl.run(self.svc.organization.create_hotel, company_id, name, parent=self, notify=False):
+            self._org_changed()
+
+    def rename_org(self) -> None:
+        sel = self._selected_org()
+        if sel is None:
+            return
+        kind, ident = sel
+        org = self.svc.organization
+        current = org.company(ident).name if kind == "c" else org.hotel(ident).name
+        name = self._ask_name(tr("org.rename"), current)
+        if not name:
+            return
+        action = org.rename_company if kind == "c" else org.rename_hotel
+        if self.ctrl.run(action, ident, name, parent=self, notify=False):
+            self._org_changed()
+
+    def delete_org(self) -> None:
+        sel = self._selected_org()
+        if sel is None or not confirm(self, tr("org.delete.confirm")):
+            return
+        kind, ident = sel
+        org = self.svc.organization
+        action = org.delete_company if kind == "c" else org.delete_hotel
+        if self.ctrl.run(action, ident, parent=self, notify=False):
+            self._org_changed()
 
     def _fill_rates(self) -> None:
         rows = [Row([Cell(format_date(r.valid_from), r.valid_from.toordinal()), Cell(f"{r.base_rate} %".replace(".", ","), align="right")],

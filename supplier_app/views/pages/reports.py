@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from PySide6.QtPrintSupport import QPrintDialog, QPrintPreviewDialog
 from PySide6.QtWidgets import QComboBox, QFileDialog, QHBoxLayout, QLabel, QVBoxLayout
 
 from supplier_app.controllers.app_controller import AppController
@@ -12,6 +13,7 @@ from supplier_app.i18n import tr
 from supplier_app.reports.builders import REPORT_KINDS
 from supplier_app.reports.exporters import EXPORTERS
 from supplier_app.reports.models import ReportTable
+from supplier_app.reports.printing import default_landscape, make_printer, print_to_pdf, render
 from supplier_app.views.errors import show_error
 from supplier_app.views.pages.base import Page
 from supplier_app.views.widgets.common import button, page_title
@@ -28,7 +30,13 @@ class ReportsPage(Page):
         self.report: ReportTable | None = None
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
-        root.addWidget(page_title(tr("nav.reports")))
+        head = QHBoxLayout()
+        head.addWidget(page_title(tr("nav.reports")))
+        self.scope_label = QLabel()
+        self.scope_label.setObjectName("ScopeBadge")
+        head.addWidget(self.scope_label)
+        head.addStretch(1)
+        root.addLayout(head)
         bar = QHBoxLayout()
         self.kind = QComboBox()
         for k in REPORT_KINDS:
@@ -47,12 +55,18 @@ class ReportsPage(Page):
         for w in (self.from_label, self.from_edit, self.to_label, self.to_edit):
             bar.addWidget(w)
         bar.addStretch(1)
-        for fmt in ("pdf", "xlsx", "csv"):
-            bar.addWidget(button(tr(f"report.export.{fmt}"), "", lambda f=fmt: self.export(f)))
         root.addLayout(bar)
+        output = QHBoxLayout()
         self.hint = QLabel()
         self.hint.setObjectName("Muted")
-        root.addWidget(self.hint)
+        output.addWidget(self.hint, 1)
+        self.btn_preview = button(tr("report.print.preview"), "", self.preview)
+        self.btn_print = button(tr("report.print"), "primary", self.print_report)
+        output.addWidget(self.btn_preview)
+        output.addWidget(self.btn_print)
+        for fmt in ("pdf", "xlsx", "csv"):
+            output.addWidget(button(tr(f"report.export.{fmt}"), "", lambda f=fmt: self.export(f)))
+        root.addLayout(output)
         self.table = DataTable()
         root.addWidget(self.table, 1)
         self.extra = DataTable(sortable=False)
@@ -86,17 +100,21 @@ class ReportsPage(Page):
     def build(self) -> None:
         kind = self.kind.currentData()
         sid = self.supplier.currentData()
+        scope = self.ctrl.scope
+        self.scope_label.setText(self.svc.organization.label(scope))
         self.hint.setText("")
         if kind == "statement" and sid is None:
             self.report = None
             self.table.set_data([], [])
             self.extra.set_data([], [])
             self.hint.setText(tr("report.statement.need_supplier"))
+            self._sync_print_buttons()
             return
         try:
             self.report = self.ctrl.ctx.reports.build(
                 kind, supplier_id=sid, date_from=get_date(self.from_edit) if kind != "open_items" else None,
-                date_to=get_date(self.to_edit) if kind != "open_items" else None, as_of=get_date(self.to_edit))
+                date_to=get_date(self.to_edit) if kind != "open_items" else None, as_of=get_date(self.to_edit),
+                scope=scope)
         except SupplierAppError as exc:
             show_error(self, exc)
             return
@@ -120,6 +138,38 @@ class ReportsPage(Page):
             self.extra.set_data([], [])
         self.extra.setVisible(bool(rep.extra))
         self.hint.setText(f"{rep.title} · {rep.subtitle}")
+        self._sync_print_buttons()
+
+    def _sync_print_buttons(self) -> None:
+        has = self.report is not None
+        self.btn_preview.setEnabled(has)
+        self.btn_print.setEnabled(has)
+
+    # -- printing ------------------------------------------------------------------------------------------
+    def preview(self) -> None:
+        if self.report is None:
+            return
+        report = self.report
+        dlg = QPrintPreviewDialog(make_printer(default_landscape(report)), self)
+        dlg.setWindowTitle(tr("report.print.preview"))
+        dlg.paintRequested.connect(lambda printer: render(report, printer))
+        dlg.resize(1100, 800)
+        dlg.exec()
+
+    def print_report(self) -> None:
+        if self.report is None:
+            return
+        printer = make_printer(default_landscape(self.report))
+        dlg = QPrintDialog(printer, self)
+        dlg.setWindowTitle(tr("report.print"))
+        if dlg.exec():
+            self.ctrl.run(render, self.report, printer, parent=self, success=tr("report.print.done"), notify=False)
+
+    def print_pdf(self, path: str) -> int | None:
+        """Same layout as the printer, written to a PDF file (also used by the tests)."""
+        if self.report is None:
+            return None
+        return self.ctrl.run(print_to_pdf, self.report, path, parent=self, notify=False)
 
     def export(self, fmt: str) -> None:
         if self.report is None:

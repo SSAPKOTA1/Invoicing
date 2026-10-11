@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import timedelta
 from decimal import Decimal
 
 from PySide6.QtCore import QObject, Qt
@@ -28,6 +29,7 @@ from supplier_app.util.money import format_cents
 from supplier_app.views.theme import repolish
 from supplier_app.views.widgets.common import button
 from supplier_app.views.widgets.inputs import MoneyEdit, get_date, make_date_edit, set_date
+from supplier_app.views.widgets.scope_picker import ScopePicker
 
 
 def mark(widget: QWidget, low: bool) -> None:
@@ -89,22 +91,42 @@ class InvoiceForm(BaseForm):
         for r in ("19", "7", "0"):
             self.vat_rate.addItem(f"{r} %", Decimal(r))
         self.net, self.vat, self.gross = MoneyEdit(), MoneyEdit(), MoneyEdit()
+        self.scope = ScopePicker(svc.organization)
+        due_row = QHBoxLayout()
+        due_row.addWidget(self.due)
+        for days in (14, 30, 60):
+            btn = button(tr("review.due_plus", n=days), "", lambda _c=False, d=days: self._due_plus(d))
+            btn.setToolTip(tr("review.due_plus.tip", n=days))
+            due_row.addWidget(btn)
+        due_row.addStretch(1)
+        due_holder = QWidget()
+        due_holder.setLayout(due_row)
+        due_row.setContentsMargins(0, 0, 0, 0)
         self.form.addRow(tr("invoice.supplier"), self.supplier)
         self.form.addRow("", self.new_name)
+        self.form.addRow(tr("org.assignment"), self.scope)
         self.form.addRow(tr("invoice.number"), self.number)
         self.form.addRow(tr("invoice.date"), self.date)
-        self.form.addRow(tr("invoice.due"), self.due)
+        self.form.addRow(tr("review.due_label"), due_holder)
         self.form.addRow(tr("invoice.vat_rate"), self.vat_rate)
         self.form.addRow(tr("invoice.net"), self.net)
         self.form.addRow(tr("invoice.vat"), self.vat)
         self.form.addRow(tr("invoice.gross"), self.gross)
         self.supplier.currentIndexChanged.connect(lambda _i: self.new_name.setVisible(self.supplier.currentData() is None))
+        self.due.dateChanged.connect(lambda _d: mark(self.due, False))  # an edited date is no longer a guess
         for w, f in ((self.number, "invoice_number"), (self.date, "document_date"), (self.due, "due_date"),
                      (self.net, "net_cents"), (self.vat, "vat_cents"), (self.gross, "gross_cents"), (self.supplier, "sender"),
                      (self.new_name, "sender")):
             self.track(w, f)
 
+    def _due_plus(self, days: int) -> None:
+        set_date(self.due, get_date(self.date) + timedelta(days=days))
+        mark(self.due, False)
+
     def load(self, r: ReviewData) -> None:
+        self.scope.reload()
+        self.form.setRowVisible(self.scope, self.svc.organization.configured)
+        self.scope.set_values(r.company_id, r.hotel_id)
         self.supplier.setCurrentIndex(max(0, self.supplier.findData(r.supplier_id)))
         self.new_name.setText(r.new_supplier_name)
         self.new_name.setVisible(self.supplier.currentData() is None)
@@ -125,6 +147,7 @@ class InvoiceForm(BaseForm):
         r.new_supplier_name = self.new_name.text().strip()
         r.invoice_number = self.number.text().strip()
         r.document_date, r.due_date = get_date(self.date), get_date(self.due)
+        r.company_id, r.hotel_id = self.scope.company_id, self.scope.hotel_id
         r.vat_rate = self.vat_rate.currentData()
         r.net_cents, r.vat_cents, r.gross_cents = self.net.cents(), self.vat.cents(), self.gross.cents()
 
@@ -315,7 +338,9 @@ class PaymentForm(BaseForm):
         self.reference, self.iban = QLineEdit(), QLineEdit()
         self.invoices = QListWidget()
         self.invoices.setMaximumHeight(130)
+        self.scope = ScopePicker(svc.organization)
         self.form.addRow(tr("payment.supplier"), self.supplier)
+        self.form.addRow(tr("org.assignment"), self.scope)
         self.form.addRow(tr("common.date"), self.date)
         self.form.addRow(tr("common.amount"), self.amount)
         self.form.addRow(tr("payment.method"), self.method)
@@ -339,6 +364,9 @@ class PaymentForm(BaseForm):
                 self.invoices.addItem(it)
 
     def load(self, r: ReviewData) -> None:
+        self.scope.reload()
+        self.form.setRowVisible(self.scope, self.svc.organization.configured)
+        self.scope.set_values(r.company_id, r.hotel_id)
         self.supplier.setCurrentIndex(max(0, self.supplier.findData(r.supplier_id)))
         self._fill(set(r.payment_invoice_ids))
         set_date(self.date, r.document_date)
@@ -352,6 +380,7 @@ class PaymentForm(BaseForm):
         r.supplier_id = self.supplier.currentData()
         r.document_date = get_date(self.date)
         r.payment_amount_cents = self.amount.cents()
+        r.company_id, r.hotel_id = self.scope.company_id, self.scope.hotel_id
         r.method = PaymentMethod(self.method.currentData())
         r.bank_reference, r.iban = self.reference.text().strip(), self.iban.text().strip()
         r.payment_invoice_ids = [self.invoices.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.invoices.count())

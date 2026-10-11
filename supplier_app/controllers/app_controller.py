@@ -10,6 +10,7 @@ from PySide6.QtCore import QEvent, QObject, QTimer, Signal
 from PySide6.QtWidgets import QApplication
 
 from supplier_app.main import AppContext
+from supplier_app.models.scope import ALL, Scope
 from supplier_app.views.theme import apply_theme
 
 log = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ class AppController(QObject):
 
     data_changed = Signal()
     theme_changed = Signal(str)
+    scope_changed = Signal(object)  # Scope
     navigate = Signal(str)
     open_invoice = Signal(int)
     open_supplier = Signal(int)
@@ -42,6 +44,7 @@ class AppController(QObject):
         super().__init__()
         self.ctx = ctx
         self.app = app
+        self._scope: Scope = ctx.services.organization.scope_from_key(ctx.services.settings.get("active_scope"))
         self._idle = QTimer(self)
         self._idle.setSingleShot(True)
         self._idle.timeout.connect(self._idle_timeout)
@@ -64,6 +67,29 @@ class AppController(QObject):
 
     def toggle_theme(self) -> None:
         self.set_theme("light" if self.theme == "dark" else "dark")
+
+    # -- scope (Gesellschaft / Hotel filter, global) ----------------------------------------------------
+    @property
+    def scope(self) -> Scope:
+        return self._scope
+
+    def set_scope(self, scope: Scope) -> None:
+        if scope == self._scope:
+            return
+        self._scope = scope
+        self.ctx.services.settings.set("active_scope", scope.key())
+        self.scope_changed.emit(scope)
+        self.notify_changed()
+
+    def reload_scope(self) -> Scope:
+        """Re-validate the active scope after companies/hotels changed (deleted entries fall back to 'all')."""
+        org = self.ctx.services.organization
+        valid = org.scope_from_key(self._scope.key()) if not self._scope.is_all else ALL
+        if valid != self._scope:
+            self.set_scope(valid)
+        else:
+            self.scope_changed.emit(self._scope)
+        return self._scope
 
     # -- data -----------------------------------------------------------------------------------
     def notify_changed(self) -> None:

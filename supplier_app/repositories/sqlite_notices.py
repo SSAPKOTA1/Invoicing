@@ -8,8 +8,10 @@ from datetime import date
 from supplier_app.errors import DuplicateError
 from supplier_app.models.entities import DunningNotice, NoticeInvoiceClaim, Payment, PaymentAllocation
 from supplier_app.models.enums import AllocationComponent, DunningLevel, PaymentMethod
+from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import NoticeRepository, PaymentRepository
 from supplier_app.repositories.sqlite_base import SqliteRepo, d2s, must_date, s2d, stamp
+from supplier_app.repositories.sqlite_invoices import scope_clause
 
 _N_COLS = (
     "id, sender_party_id, supplier_id, notice_date, level, new_deadline, principal_cents, fees_cents,"
@@ -74,9 +76,15 @@ class SqliteNoticeRepository(SqliteRepo, NoticeRepository):
         return self._hydrate(row) if row else None
 
     def list(
-        self, *, supplier_id: int | None = None, invoice_id: int | None = None, case_id: int | None = None
+        self, *, supplier_id: int | None = None, invoice_id: int | None = None, case_id: int | None = None,
+        scope: Scope | None = None,
     ) -> list[DunningNotice]:
         sql, params = f"SELECT {_N_COLS} FROM dunning_notices WHERE 1=1", []
+        clause, extra = scope_clause(scope, "i")
+        if clause:
+            sql += (" AND id IN (SELECT ni.notice_id FROM notice_invoices ni JOIN invoices i ON i.id = ni.invoice_id"
+                    f" WHERE 1=1{clause})")
+            params.extend(extra)
         if supplier_id is not None:
             sql += " AND supplier_id=?"
             params.append(supplier_id)
@@ -87,6 +95,9 @@ class SqliteNoticeRepository(SqliteRepo, NoticeRepository):
             sql += " AND case_id=?"
             params.append(case_id)
         return [self._hydrate(r) for r in self.db.query_all(sql + " ORDER BY notice_date, id", params)]
+
+    def set_deadline(self, notice_id: int, deadline: date | None) -> None:
+        self.db.execute("UPDATE dunning_notices SET new_deadline=? WHERE id=?", (d2s(deadline), notice_id))
 
     def set_case(self, notice_id: int, case_id: int | None) -> None:
         self.db.execute("UPDATE dunning_notices SET case_id=? WHERE id=?", (case_id, notice_id))
@@ -99,16 +110,18 @@ class SqlitePaymentRepository(SqliteRepo, PaymentRepository):
             id=row["id"], supplier_id=row["supplier_id"], payment_date=must_date(row["payment_date"]),
             amount_cents=row["amount_cents"], method=PaymentMethod(row["method"]),
             bank_reference=row["bank_reference"], iban=row["iban"], notes=row["notes"],
-            document_id=row["document_id"], created_at=row["created_at"],
+            document_id=row["document_id"], company_id=row["company_id"], hotel_id=row["hotel_id"],
+            created_at=row["created_at"],
         )
 
     def add(self, payment: Payment) -> Payment:
         payment.created_at = stamp(payment.created_at)
         payment.id = self.db.insert(
             "INSERT INTO payments(supplier_id, payment_date, amount_cents, method, bank_reference, iban, notes,"
-            " document_id, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
+            " document_id, company_id, hotel_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (payment.supplier_id, d2s(payment.payment_date), payment.amount_cents, payment.method.value,
-             payment.bank_reference, payment.iban, payment.notes, payment.document_id, payment.created_at),
+             payment.bank_reference, payment.iban, payment.notes, payment.document_id, payment.company_id,
+             payment.hotel_id, payment.created_at),
         )
         return payment
 
@@ -117,9 +130,15 @@ class SqlitePaymentRepository(SqliteRepo, PaymentRepository):
         return self._payment(row) if row else None
 
     def list(
-        self, *, supplier_id: int | None = None, date_from: date | None = None, date_to: date | None = None
+        self, *, supplier_id: int | None = None, date_from: date | None = None, date_to: date | None = None,
+        scope: Scope | None = None,
     ) -> list[Payment]:
         sql, params = "SELECT * FROM payments WHERE 1=1", []
+        if scope is not None and not scope.is_all:
+            col, val = ("hotel_id", scope.hotel_id) if scope.hotel_id is not None else ("company_id", scope.company_id)
+            sql += (f" AND (payments.{col} = ? OR EXISTS (SELECT 1 FROM payment_allocations a JOIN invoices i"
+                    f" ON i.id = a.invoice_id WHERE a.payment_id = payments.id AND i.{col} = ?))")
+            params.extend([val, val])
         if supplier_id is not None:
             sql += " AND supplier_id=?"
             params.append(supplier_id)
@@ -152,12 +171,17 @@ class SqlitePaymentRepository(SqliteRepo, PaymentRepository):
             for r in self.db.query_all(sql + " ORDER BY id", params)
         ]
 
-    def allocation_sums(self, *, as_of: date | None = None) -> list[tuple[int, str, int]]:
+    def allocation_sums(self, *, as_of: date | None = None, scope: Scope | None = None) -> list[tuple[int, str, int]]:
         sql = ("SELECT a.invoice_id, a.component, SUM(a.amount_cents) FROM payment_allocations a"
                " JOIN payments p ON p.id = a.payment_id")
         params: list[object] = []
+        clause, extra = scope_clause(scope, "i")
+        if clause:
+            sql += " JOIN invoices i ON i.id = a.invoice_id"
+        sql += " WHERE 1=1" + clause
+        params.extend(extra)
         if as_of:
-            sql += " WHERE p.payment_date <= ?"
+            sql += " AND p.payment_date <= ?"
             params.append(d2s(as_of))
         sql += " GROUP BY a.invoice_id, a.component"
         return [(r[0], r[1], r[2]) for r in self.db.query_all(sql, params)]

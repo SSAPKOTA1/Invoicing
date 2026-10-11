@@ -8,6 +8,7 @@ from supplier_app.errors import NotFoundError
 from supplier_app.i18n import tr
 from supplier_app.models.entities import Case, CaseEvent
 from supplier_app.models.enums import CaseStatus, InvoiceStatus
+from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import Repositories
 from supplier_app.services.base import ServiceBase, today
 
@@ -76,8 +77,9 @@ class CaseService(ServiceBase):
         elif case.status in (CaseStatus.PAID, CaseStatus.IN_DISPUTE):
             self.set_status(case.id, CaseStatus.OPEN)
 
-    def list(self, supplier_id: int | None = None, status: CaseStatus | None = None) -> list[Case]:
-        return self.repos.cases.list(supplier_id=supplier_id, status=status.value if status else None)
+    def list(self, supplier_id: int | None = None, status: CaseStatus | None = None,
+             scope: Scope | None = None) -> list[Case]:
+        return self.repos.cases.list(supplier_id=supplier_id, status=status.value if status else None, scope=scope)
 
     def events(self, case_id: int) -> list[CaseEvent]:
         return self.repos.cases.events(case_id)

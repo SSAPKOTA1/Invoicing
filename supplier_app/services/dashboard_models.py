@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
+from supplier_app.models.scope import ALL, Scope
+
 
 @dataclass(frozen=True)
 class DrillTarget:
@@ -24,10 +26,11 @@ class DashboardFilter:
     as_of: date
     supplier_id: int | None = None
     period: str = "month"
+    scope: Scope = ALL
 
     @staticmethod
     def for_period(period: str, today: date, supplier_id: int | None = None, as_of: date | None = None,
-                   custom: tuple[date, date] | None = None) -> DashboardFilter:
+                   custom: tuple[date, date] | None = None, scope: Scope = ALL) -> DashboardFilter:
         if period == "custom" and custom:
             start, end = custom
         elif period == "year":
@@ -41,7 +44,7 @@ class DashboardFilter:
             period = "month"
             start = date(today.year, today.month, 1)
             end = date(today.year, today.month, calendar.monthrange(today.year, today.month)[1])
-        return DashboardFilter(start, end, as_of if as_of is not None else today, supplier_id, period)
+        return DashboardFilter(start, end, as_of if as_of is not None else today, supplier_id, period, scope)
 
     def previous(self) -> DashboardFilter:
         """The period of the same length directly before this one."""
@@ -56,7 +59,7 @@ class DashboardFilter:
                 start = date(end.year, q0, 1)
             else:
                 start = date(end.year, 1, 1)
-        return DashboardFilter(start, end, end, self.supplier_id, self.period)
+        return DashboardFilter(start, end, end, self.supplier_id, self.period, self.scope)
 
 
 @dataclass

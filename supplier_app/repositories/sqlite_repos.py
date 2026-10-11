@@ -19,6 +19,7 @@ from supplier_app.repositories.sqlite_misc import (
     SqliteSettingsRepository,
 )
 from supplier_app.repositories.sqlite_notices import SqliteNoticeRepository, SqlitePaymentRepository
+from supplier_app.repositories.sqlite_organization import SqliteOrganizationRepository
 from supplier_app.repositories.sqlite_parties import SqlitePartyRepository
 
 
@@ -39,6 +40,7 @@ class SqliteRepositories(Repositories):
         self.rates = SqliteRateRepository(db)
         self.categories = SqliteCategoryRepository(db)
         self.audit = SqliteAuditRepository(db)
+        self.organization = SqliteOrganizationRepository(db)
 
     def transaction(self) -> AbstractContextManager[None]:
         return self.db.transaction()

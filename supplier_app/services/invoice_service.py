@@ -9,10 +9,12 @@ from decimal import Decimal
 from supplier_app.errors import LedgerError, NotFoundError, ValidationError
 from supplier_app.models.entities import DocumentReference, Invoice
 from supplier_app.models.enums import EntityKind, InvoiceStatus, LedgerEntryType, PartyRole, ReferenceType
+from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import Repositories
 from supplier_app.services.base import ServiceBase, today
 from supplier_app.services.case_service import CaseService
 from supplier_app.services.ledger_service import LedgerService
+from supplier_app.services.organization_service import OrganizationService
 from supplier_app.services.settings_service import SettingsService
 from supplier_app.util.money import format_cents, percent_of
 from supplier_app.util.normalize import normalize_reference
@@ -43,8 +45,12 @@ def compute_amounts(
 
 
 class InvoiceService(ServiceBase):
-    def __init__(self, repos: Repositories, ledger: LedgerService, cases: CaseService, settings: SettingsService) -> None:
+    def __init__(
+        self, repos: Repositories, ledger: LedgerService, cases: CaseService, settings: SettingsService,
+        organization: OrganizationService | None = None,
+    ) -> None:
         super().__init__(repos)
+        self.organization = organization or OrganizationService(repos)
         self.ledger = ledger
         self.cases = cases
         self.settings = settings
@@ -77,6 +83,8 @@ class InvoiceService(ServiceBase):
         category_id: int | None = None,
         document_id: int | None = None,
         references: Sequence[tuple[ReferenceType, str]] = (),
+        company_id: int | None = None,
+        hotel_id: int | None = None,
     ) -> Invoice:
         """Create an invoice and book the INVOICE ledger entry."""
         supplier = self.repos.parties.get(supplier_id)
@@ -90,11 +98,13 @@ class InvoiceService(ServiceBase):
         due = due_date or invoice_date + timedelta(days=self.settings.default_payment_days)
         if due < invoice_date:
             raise ValidationError("Das Fälligkeitsdatum liegt vor dem Rechnungsdatum.")
+        company_id, hotel_id = self.organization.resolve(company_id, hotel_id)
         with self.repos.transaction():
             invoice = self.repos.invoices.add(Invoice(
                 supplier_id=supplier_id, invoice_number=invoice_number.strip(), invoice_date=invoice_date,
                 due_date=due, net_cents=net, vat_rate=vat_rate, vat_cents=vat, gross_cents=gross,
-                currency=currency.upper(), notes=notes, category_id=category_id))
+                currency=currency.upper(), notes=notes, category_id=category_id,
+                company_id=company_id, hotel_id=hotel_id))
             assert invoice.id is not None
             self.ledger.post(
                 entry_date=invoice_date, supplier_id=supplier_id, entry_type=LedgerEntryType.INVOICE,
@@ -122,6 +132,31 @@ class InvoiceService(ServiceBase):
             invoice.category_id = category_id
         self.repos.invoices.update(invoice)
         self._audit("update", "invoice", invoice_id)
+        return invoice
+
+    def change_due_date(self, invoice_id: int, due_date: date) -> Invoice:
+        """Edit the Fälligkeitsdatum later on; the change is audited and noted in the case timeline."""
+        invoice = self.get(invoice_id)
+        old = invoice.due_date
+        if due_date == old:
+            return invoice
+        invoice = self.update_details(invoice_id, due_date=due_date)
+        old_text = old.strftime("%d.%m.%Y") if old else "–"
+        self._audit("due_date", "invoice", invoice_id, f"{old_text} -> {due_date.strftime('%d.%m.%Y')}")
+        case = self.repos.cases.get_by_invoice(invoice_id)
+        if case is not None and case.id is not None:
+            self.cases.add_event(case.id, "due_date", f"Fälligkeit geändert: {old_text} → {due_date.strftime('%d.%m.%Y')}")
+        return invoice
+
+    def assign_scope(self, invoice_id: int, company_id: int | None, hotel_id: int | None) -> Invoice:
+        """(Re)assign the invoice to a hotel (its company follows automatically) or to a company only."""
+        invoice = self.get(invoice_id)
+        company_id, hotel_id = self.organization.resolve(company_id, hotel_id)
+        with self.repos.transaction():
+            self.repos.invoices.set_scope(invoice_id, company_id, hotel_id)
+            self._audit("assign_scope", "invoice", invoice_id,
+                        self.organization.item_label(company_id, hotel_id))
+        invoice.company_id, invoice.hotel_id = company_id, hotel_id
         return invoice
 
     def credit_note(self, invoice_id: int, amount_cents: int, on: date, comment: str = "",
@@ -188,5 +223,7 @@ class InvoiceService(ServiceBase):
         self.ledger.refresh_status(invoice_id)
         self.cases.sync_with_invoice(invoice_id)
 
-    def list(self, supplier_id: int | None = None, status: InvoiceStatus | None = None) -> list[Invoice]:
-        return self.repos.invoices.list(supplier_id=supplier_id, status=status)
+    def list(
+        self, supplier_id: int | None = None, status: InvoiceStatus | None = None, scope: Scope | None = None
+    ) -> list[Invoice]:
+        return self.repos.invoices.list(supplier_id=supplier_id, status=status, scope=scope)

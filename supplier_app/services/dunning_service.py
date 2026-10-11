@@ -10,6 +10,7 @@ from supplier_app.errors import DuplicateError, NotFoundError, ValidationError
 from supplier_app.i18n import level_label
 from supplier_app.models.entities import DocumentReference, DunningNotice, LedgerEntry, NoticeInvoiceClaim
 from supplier_app.models.enums import DunningLevel, EntityKind, PartyRole, ReferenceType
+from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import Repositories
 from supplier_app.services.base import ServiceBase
 from supplier_app.services.case_service import CaseService
@@ -191,8 +192,27 @@ class DunningService(ServiceBase):
             raise NotFoundError("Schreiben nicht gefunden.")
         return notice
 
-    def list(self, supplier_id: int | None = None, invoice_id: int | None = None) -> list[DunningNotice]:
-        return self.repos.notices.list(supplier_id=supplier_id, invoice_id=invoice_id)
+    def list(
+        self, supplier_id: int | None = None, invoice_id: int | None = None, scope: Scope | None = None
+    ) -> list[DunningNotice]:
+        return self.repos.notices.list(supplier_id=supplier_id, invoice_id=invoice_id, scope=scope)
+
+    def update_deadline(self, notice_id: int, deadline: date) -> DunningNotice:
+        """Edit the payment deadline printed on a notice later on (audited, noted in the case timeline)."""
+        notice = self.get(notice_id)
+        old = notice.new_deadline
+        if old == deadline:
+            return notice
+        with self.repos.transaction():
+            self.repos.notices.set_deadline(notice_id, deadline)
+            old_text = format_date(old) if old else "–"
+            self._audit("deadline", "notice", notice_id, f"{old_text} -> {format_date(deadline)}")
+            for claim in notice.claims:
+                case = self.repos.cases.get_by_invoice(claim.invoice_id)
+                if case is not None and case.id is not None:
+                    self.cases.add_event(case.id, "deadline", f"Frist geändert: {old_text} → {format_date(deadline)}")
+        notice.new_deadline = deadline
+        return notice
 
     def reconcile(self, notice_id: int) -> NoticeReconciliation:
         return self.ledger.reconcile_notice(notice_id)
@@ -211,10 +231,10 @@ class DunningService(ServiceBase):
                                           self.settings.flat_fee_cents))
         return rows
 
-    def escalated_invoice_ids(self) -> set[int]:
+    def escalated_invoice_ids(self, scope: Scope | None = None) -> set[int]:
         """Invoices with a collection letter or court order."""
         ids: set[int] = set()
-        for notice in self.repos.notices.list():
+        for notice in self.repos.notices.list(scope=scope):
             if notice.level >= DunningLevel.COLLECTION:
                 ids.update(c.invoice_id for c in notice.claims)
         return ids

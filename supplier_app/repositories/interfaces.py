@@ -11,9 +11,11 @@ from supplier_app.models.entities import (
     Case,
     CaseEvent,
     Category,
+    Company,
     Document,
     DocumentReference,
     DunningNotice,
+    Hotel,
     InterestRate,
     Invoice,
     LedgerEntry,
@@ -22,6 +24,7 @@ from supplier_app.models.entities import (
     PaymentAllocation,
 )
 from supplier_app.models.enums import InvoiceStatus, PartyRole, ReviewStatus
+from supplier_app.models.scope import Scope
 
 
 class PartyRepository(ABC):
@@ -60,9 +63,13 @@ class InvoiceRepository(ABC):
     @abstractmethod
     def find_by_number_norm(self, norm: str, supplier_id: int | None = None, prefix: bool = False) -> list[Invoice]: ...
     @abstractmethod
-    def list(self, supplier_id: int | None = None, status: InvoiceStatus | None = None) -> list[Invoice]: ...
+    def list(
+        self, supplier_id: int | None = None, status: InvoiceStatus | None = None, scope: Scope | None = None
+    ) -> list[Invoice]: ...
     @abstractmethod
     def set_status(self, invoice_id: int, status: InvoiceStatus) -> None: ...
+    @abstractmethod
+    def set_scope(self, invoice_id: int, company_id: int | None, hotel_id: int | None) -> None: ...
     @abstractmethod
     def find_by_gross(self, gross_cents: int, supplier_id: int | None = None) -> list[Invoice]: ...
 
@@ -82,22 +89,27 @@ class LedgerRepository(ABC):
         date_to: date | None = None,
         notice_id: int | None = None,
         payment_id: int | None = None,
+        scope: Scope | None = None,
     ) -> list[LedgerEntry]: ...
     @abstractmethod
     def is_reversed(self, entry_id: int) -> bool: ...
     @abstractmethod
     def sums_by_invoice(
-        self, *, as_of: date | None = None, supplier_id: int | None = None
+        self, *, as_of: date | None = None, supplier_id: int | None = None, scope: Scope | None = None
     ) -> list[tuple[int, int, str, int]]:
         """Rows ``(invoice_id, supplier_id, category_type, total_cents)`` for entries with an invoice."""
     @abstractmethod
-    def unapplied_by_supplier(self, *, as_of: date | None = None) -> dict[int, int]:
+    def unapplied_by_supplier(self, *, as_of: date | None = None, scope: Scope | None = None) -> dict[int, int]:
         """Sum of entries without invoice per supplier (negative = credit on account)."""
     @abstractmethod
-    def balances_by_invoice(self, *, as_of: date | None = None, supplier_id: int | None = None) -> dict[int, int]:
+    def balances_by_invoice(
+        self, *, as_of: date | None = None, supplier_id: int | None = None, scope: Scope | None = None
+    ) -> dict[int, int]:
         """Sum of all entries per invoice (the open balance), one row per invoice."""
     @abstractmethod
-    def unapplied_entries(self, *, supplier_id: int | None = None, as_of: date | None = None) -> list[LedgerEntry]:
+    def unapplied_entries(
+        self, *, supplier_id: int | None = None, as_of: date | None = None, scope: Scope | None = None
+    ) -> list[LedgerEntry]:
         """Not yet reversed PAYMENT entries without invoice (credit on account)."""
     @abstractmethod
     def sums_by_type(
@@ -107,6 +119,7 @@ class LedgerRepository(ABC):
         date_to: date | None = None,
         supplier_id: int | None = None,
         month_buckets: bool = False,
+        scope: Scope | None = None,
     ) -> list[tuple[str, str, int]]:
         """Rows ``(bucket, category_type, total)``; bucket is ``YYYY-MM`` or ``''``."""
     @abstractmethod
@@ -122,10 +135,13 @@ class NoticeRepository(ABC):
     def find_by_dedup_key(self, key: str) -> DunningNotice | None: ...
     @abstractmethod
     def list(
-        self, *, supplier_id: int | None = None, invoice_id: int | None = None, case_id: int | None = None
+        self, *, supplier_id: int | None = None, invoice_id: int | None = None, case_id: int | None = None,
+        scope: Scope | None = None,
     ) -> list[DunningNotice]: ...
     @abstractmethod
     def set_case(self, notice_id: int, case_id: int | None) -> None: ...
+    @abstractmethod
+    def set_deadline(self, notice_id: int, deadline: date | None) -> None: ...
 
 
 class PaymentRepository(ABC):
@@ -135,7 +151,8 @@ class PaymentRepository(ABC):
     def get(self, payment_id: int) -> Payment | None: ...
     @abstractmethod
     def list(
-        self, *, supplier_id: int | None = None, date_from: date | None = None, date_to: date | None = None
+        self, *, supplier_id: int | None = None, date_from: date | None = None, date_to: date | None = None,
+        scope: Scope | None = None,
     ) -> list[Payment]: ...
     @abstractmethod
     def add_allocation(self, alloc: PaymentAllocation) -> PaymentAllocation: ...
@@ -144,7 +161,7 @@ class PaymentRepository(ABC):
         self, *, payment_id: int | None = None, invoice_id: int | None = None
     ) -> list[PaymentAllocation]: ...
     @abstractmethod
-    def allocation_sums(self, *, as_of: date | None = None) -> list[tuple[int, str, int]]:
+    def allocation_sums(self, *, as_of: date | None = None, scope: Scope | None = None) -> list[tuple[int, str, int]]:
         """Rows ``(invoice_id, component, total)`` of allocations booked up to ``as_of``."""
 
 
@@ -158,8 +175,11 @@ class DocumentRepository(ABC):
     @abstractmethod
     def update(self, doc: Document) -> None: ...
     @abstractmethod
+    def set_scope(self, doc_id: int, company_id: int | None, hotel_id: int | None) -> None: ...
+    @abstractmethod
     def list(
-        self, *, review_status: ReviewStatus | None = None, supplier_id: int | None = None, limit: int | None = None
+        self, *, review_status: ReviewStatus | None = None, supplier_id: int | None = None, limit: int | None = None,
+        scope: Scope | None = None,
     ) -> list[Document]: ...
     @abstractmethod
     def fulltext(self, fts_query: str, limit: int = 50) -> list[tuple[int, str]]:
@@ -188,7 +208,9 @@ class CaseRepository(ABC):
     @abstractmethod
     def update(self, case: Case) -> None: ...
     @abstractmethod
-    def list(self, *, supplier_id: int | None = None, status: str | None = None) -> list[Case]: ...
+    def list(
+        self, *, supplier_id: int | None = None, status: str | None = None, scope: Scope | None = None
+    ) -> list[Case]: ...
     @abstractmethod
     def add_event(self, event: CaseEvent) -> CaseEvent: ...
     @abstractmethod
@@ -231,6 +253,35 @@ class AuditRepository(ABC):
     def list(self, *, limit: int = 200, entity: str | None = None) -> list[AuditLogEntry]: ...
 
 
+class OrganizationRepository(ABC):
+    """Own companies (Gesellschaften) and their hotels."""
+
+    @abstractmethod
+    def add_company(self, company: Company) -> Company: ...
+    @abstractmethod
+    def update_company(self, company: Company) -> None: ...
+    @abstractmethod
+    def get_company(self, company_id: int) -> Company | None: ...
+    @abstractmethod
+    def companies(self) -> list[Company]: ...
+    @abstractmethod
+    def delete_company(self, company_id: int) -> None: ...
+    @abstractmethod
+    def add_hotel(self, hotel: Hotel) -> Hotel: ...
+    @abstractmethod
+    def update_hotel(self, hotel: Hotel) -> None: ...
+    @abstractmethod
+    def get_hotel(self, hotel_id: int) -> Hotel | None: ...
+    @abstractmethod
+    def hotels(self, company_id: int | None = None) -> list[Hotel]: ...
+    @abstractmethod
+    def delete_hotel(self, hotel_id: int) -> None: ...
+    @abstractmethod
+    def hotel_has_items(self, hotel_id: int) -> bool: ...
+    @abstractmethod
+    def company_has_items(self, company_id: int) -> bool: ...
+
+
 class Repositories(ABC):
     """Bundle of all repositories plus the transaction scope."""
 
@@ -246,6 +297,7 @@ class Repositories(ABC):
     rates: RateRepository
     categories: CategoryRepository
     audit: AuditRepository
+    organization: OrganizationRepository
 
     @abstractmethod
     def transaction(self) -> Any:

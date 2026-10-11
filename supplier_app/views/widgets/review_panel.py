@@ -138,6 +138,9 @@ class ReviewPanel(QWidget):
         decided = doc.review_status in (ReviewStatus.ACCEPTED, ReviewStatus.REJECTED)
         self.review = svc.ingest.build_review(doc_id)
         r = self.review
+        scope = self.ctrl.scope
+        if not decided and r.company_id is None and r.hotel_id is None and not scope.is_all:
+            r.company_id, r.hotel_id = scope.company_id, scope.hotel_id  # import while a hotel is selected: preassign
         self.kind.blockSignals(True)
         self.kind.setCurrentIndex(max(0, self.kind.findData(r.kind)))
         self.kind.blockSignals(False)

@@ -65,6 +65,20 @@ Unter *Einstellungen → Pfade* öffnet ein Klick den Datenordner.
 | Strg+L | sperren (wenn PIN aktiv) |
 | F5 | aktualisieren |
 
+### Gesellschaften und Hotels
+
+* **Einstellungen → Gesellschaften & Hotels**: Gesellschaften anlegen und ihnen Hotels zuordnen (Umbenennen/Löschen; Löschen nur ohne zugeordnete Belege).
+* **Zuordnung**: Eine Rechnung/Zahlung/ein Dokument gehört zu einem **Hotel** (die Gesellschaft ergibt sich automatisch) oder nur zu einer **Gesellschaft**. Beim Import, in „Rechnung erfassen“ und später über **Zuordnung ändern …** im Vorgang einstellbar. Beim Import wird das Hotel anhand des Empfängers im Text vorgeschlagen.
+* **Ansicht** (oben rechts): *Alle Gesellschaften*, *Gesellschaft (alle Hotels)* oder *einzelnes Hotel*. Der Filter wirkt auf **alle** Bereiche – Übersicht, Lieferanten, Vorgänge, Dokumente, Buchungen, Berichte, Suche – und wird beim nächsten Start wiederhergestellt. Nicht zugeordnete Dokumente bleiben in jeder Ansicht sichtbar, damit nichts verloren geht.
+
+### Fälligkeitsdatum
+
+Beim Import steht im Prüfformular das Feld **Fälligkeitsdatum** (mit Schaltflächen +14 / +30 / +60 Tage). Wird keins erkannt, wird *Rechnungsdatum + Zahlungsziel* vorgeschlagen und als unsicher markiert. Später änderbar im Vorgang: **Fälligkeit ändern …** (Rechnung) und **Frist ändern …** (markierte Mahnung); jede Änderung wird protokolliert.
+
+### Berichte drucken
+
+Berichte → **Druckvorschau …** / **Drucken …**: A4 mit Kopfzeile (Titel, Filter, Gesellschaft/Hotel), wiederholter Tabellenkopf auf jeder Seite und „Seite x von y“. Breite Tabellen werden quer gedruckt (in der Vorschau/im Druckdialog änderbar). Über einen PDF-Drucker lässt sich auch eine PDF-Datei erzeugen.
+
 ### PIN-Sperre (optional)
 
 *Einstellungen → Sicherheit*: PIN mit 4–8 Ziffern (scrypt-Hash mit Salt), nach 5 Fehlversuchen steigende Wartezeit, automatische

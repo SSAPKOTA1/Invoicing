@@ -37,6 +37,7 @@ DEFAULTS: dict[str, str] = {
     "idle_lock_minutes": "10",
     "low_confidence": "0.75",
     "reference_rules": "",
+    "active_scope": "",
 }
 
 

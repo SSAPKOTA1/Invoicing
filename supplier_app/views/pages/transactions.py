@@ -29,7 +29,13 @@ class TransactionsPage(Page):
         super().__init__(ctrl)
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
-        root.addWidget(page_title(tr("nav.transactions")))
+        head = QHBoxLayout()
+        head.addWidget(page_title(tr("nav.transactions")))
+        self.scope_label = QLabel()
+        self.scope_label.setObjectName("ScopeBadge")
+        head.addWidget(self.scope_label)
+        head.addStretch(1)
+        root.addLayout(head)
         bar = QHBoxLayout()
         self.supplier = QComboBox()
         self.type = QComboBox()
@@ -75,7 +81,9 @@ class TransactionsPage(Page):
         sid = self.supplier.currentData()
         d_from = get_date(self.from_edit) if self.use_period.isChecked() else None
         d_to = get_date(self.to_edit) if self.use_period.isChecked() else None
-        entries = svc.repos.ledger.list(supplier_id=sid, date_from=d_from, date_to=d_to)
+        scope = self.ctrl.scope
+        self.scope_label.setText(svc.organization.label(scope))
+        entries = svc.repos.ledger.list(supplier_id=sid, date_from=d_from, date_to=d_to, scope=scope)
         wanted = self.type.currentData()
         if wanted:
             entries = [e for e in entries if e.entry_type == wanted]
@@ -83,8 +91,23 @@ class TransactionsPage(Page):
         total = len(entries)
         entries = entries[:ROW_LIMIT]
         names = {p.id: p.name for p in svc.suppliers.list()}
-        numbers = {i.id: i.invoice_number for i in svc.invoices.list(supplier_id=sid)}
-        reversed_ids = {e.reverses_entry_id for e in svc.repos.ledger.list(supplier_id=sid, date_from=d_from) if e.reverses_entry_id}
+        invoices = {i.id: i for i in svc.invoices.list(supplier_id=sid)}
+        numbers = {iid: i.invoice_number for iid, i in invoices.items()}
+        reversed_ids = {e.reverses_entry_id for e in svc.repos.ledger.list(supplier_id=sid, date_from=d_from, scope=scope)
+                        if e.reverses_entry_id}
+        payment_scopes: dict[int, str] = {}
+
+        def where(entry) -> str:
+            if entry.invoice_id and entry.invoice_id in invoices:
+                inv = invoices[entry.invoice_id]
+                return svc.organization.item_label(inv.company_id, inv.hotel_id)
+            if entry.payment_id:
+                if entry.payment_id not in payment_scopes:
+                    pay = svc.repos.payments.get(entry.payment_id)
+                    payment_scopes[entry.payment_id] = (
+                        svc.organization.item_label(pay.company_id, pay.hotel_id) if pay else "–")
+                return payment_scopes[entry.payment_id]
+            return "–"
         self._entries = {e.id: e for e in entries if e.id}
         rows = []
         for e in entries:
@@ -94,12 +117,13 @@ class TransactionsPage(Page):
             tone = "muted" if e.id in reversed_ids else ""
             rows.append(Row([Cell(format_date(e.entry_date), e.entry_date.toordinal()), Cell(names.get(e.supplier_id, ""), tone=tone),
                              Cell(numbers.get(e.invoice_id, "") if e.invoice_id else tr("transactions.credit_account"), tone=tone),
-                             Cell(label, tone=tone),
+                             Cell(where(e), tone=tone), Cell(label, tone=tone),
                              Cell(format_cents(e.amount_cents, plus=True), e.amount_cents, "right",
                                   "ok" if e.amount_cents < 0 else ""), Cell(e.comment, tone=tone),
                              Cell("📎" if e.document_id else "", align="center")], (e.invoice_id, e.id)))
-        self.table.set_data([tr("common.date"), tr("supplier.name"), tr("invoice.number"), tr("history.col.kind"),
-                             tr("common.amount"), tr("history.col.text"), ""], rows, [95, 220, 150, 190, 120, 360, 40])
+        self.table.set_data([tr("common.date"), tr("supplier.name"), tr("invoice.number"), tr("org.hotel_company"),
+                             tr("history.col.kind"), tr("common.amount"), tr("history.col.text"), ""], rows,
+                            [95, 200, 140, 170, 170, 115, 300, 40])
         self.table.setSortingEnabled(True)
         shown = len(entries)
         self.footer.setText(tr("transactions.footer", shown=shown, total=total, sum=format_cents(sum(e.amount_cents for e in entries))))

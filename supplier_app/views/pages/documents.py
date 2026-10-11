@@ -54,6 +54,9 @@ class DocumentsPage(Page):
         root.setContentsMargins(24, 20, 24, 20)
         head = QHBoxLayout()
         head.addWidget(page_title(tr("nav.documents")))
+        self.scope_label = QLabel()
+        self.scope_label.setObjectName("ScopeBadge")
+        head.addWidget(self.scope_label)
         head.addStretch(1)
         head.addWidget(button(tr("action.import"), "primary", self.choose_files))
         root.addLayout(head)
@@ -107,7 +110,8 @@ class DocumentsPage(Page):
     # -- list -----------------------------------------------------------------------------------------------
     def refresh(self) -> None:
         mode = self.status.currentData()
-        docs = self.svc.repos.documents.list()
+        self.scope_label.setText(self.svc.organization.label(self.ctrl.scope))
+        docs = self.svc.repos.documents.list(scope=self.ctrl.scope)
         if mode == "review":
             docs = [d for d in docs if d.review_status in (ReviewStatus.PENDING, ReviewStatus.NEEDS_REVIEW)]
         elif mode == "accepted":
@@ -120,10 +124,12 @@ class DocumentsPage(Page):
             tone = "warn" if d.review_status == ReviewStatus.NEEDS_REVIEW else (
                 "ok" if d.review_status == ReviewStatus.ACCEPTED else "muted" if d.review_status == ReviewStatus.REJECTED else "")
             rows.append(Row([d.original_name, tr(f"doctype.{d.doc_type.value}"),
+                             self.svc.organization.item_label(d.company_id, d.hotel_id),
                              Cell(f"{int(d.confidence * 100)} %", d.confidence, "right", "bad" if d.confidence < threshold else ""),
                              Cell(tr(f"review.{d.review_status.value}"), tone=tone)], d.id))
         keep = self.doc_id
-        self.table.set_data([tr("doc.name"), tr("doc.type"), tr("doc.confidence"), tr("doc.status")], rows, [150, 110, 80, 90])
+        self.table.set_data([tr("doc.name"), tr("doc.type"), tr("org.hotel_company"), tr("doc.confidence"),
+                            tr("doc.status")], rows, [150, 110, 140, 70, 90])
         if keep is not None and not self.table.select_payload(keep):
             self.doc_id = None
             self.review.load(None)

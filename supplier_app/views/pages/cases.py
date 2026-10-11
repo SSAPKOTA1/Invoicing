@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLineEdit, QSplitter, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QLineEdit, QSplitter, QVBoxLayout, QWidget
 
 from supplier_app.controllers.app_controller import AppController
 from supplier_app.i18n import level_label, tr
@@ -26,7 +26,13 @@ class CasesPage(Page):
         super().__init__(ctrl)
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
-        root.addWidget(page_title(tr("nav.cases")))
+        head = QHBoxLayout()
+        head.addWidget(page_title(tr("nav.cases")))
+        self.scope_label = QLabel()
+        self.scope_label.setObjectName("ScopeBadge")
+        head.addWidget(self.scope_label)
+        head.addStretch(1)
+        root.addLayout(head)
         split = QSplitter(Qt.Orientation.Horizontal)
         left = QWidget()
         lay = QVBoxLayout(left)
@@ -58,22 +64,26 @@ class CasesPage(Page):
         status = CaseStatus(self.status.currentData()) if self.status.currentData() else None
         keep = self.table.selected_payload()
         rows = []
-        for c in svc.cases.list(status=status):
+        self.scope_label.setText(svc.organization.label(self.ctrl.scope))
+        for c in svc.cases.list(status=status, scope=self.ctrl.scope):
             if c.invoice_id is None:
                 continue
+            invoice = svc.invoices.get(c.invoice_id)
             bal = svc.ledger.invoice_balance(c.invoice_id)
             level = svc.dunning.latest_level(c.invoice_id)
             supplier = svc.repos.parties.get(c.supplier_id)
             deadline = svc.history.next_deadline(c.invoice_id)
             overdue = deadline is not None and deadline < date.today() and bal.balance_cents > 0
-            rows.append(Row([supplier.name if supplier else "", svc.invoices.get(c.invoice_id).invoice_number,
+            rows.append(Row([supplier.name if supplier else "", invoice.invoice_number,
+                             svc.organization.item_label(invoice.company_id, invoice.hotel_id),
                              Cell(tr(f"case.{c.status.value}"), c.status.value),
                              level_label(int(level)) if level else "–",
                              Cell(format_cents(bal.balance_cents), bal.balance_cents, "right"),
                              Cell(format_date(deadline), deadline.toordinal() if deadline else 0, tone="bad" if overdue else "")],
                             c.invoice_id))
-        self.table.set_data([tr("supplier.name"), tr("invoice.number"), tr("invoice.status"), tr("notice.level"),
-                             tr("invoice.open"), tr("history.deadline")], rows, [150, 100, 85, 105, 90, 90])
+        self.table.set_data([tr("supplier.name"), tr("invoice.number"), tr("org.hotel_company"), tr("invoice.status"),
+                             tr("notice.level"), tr("invoice.open"), tr("history.deadline")], rows,
+                            [150, 100, 170, 85, 105, 90, 90])
         if keep is not None:
             self.table.select_payload(keep)
         self.history.refresh()

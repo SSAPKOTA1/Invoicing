@@ -34,6 +34,8 @@ class ReviewData:
     kind: str = KIND_NONE
     doc_type: DocumentType = DocumentType.OTHER
     supplier_id: int | None = None
+    company_id: int | None = None  # own company / hotel the document is for (hotel implies its company)
+    hotel_id: int | None = None
     new_supplier_name: str = ""
     sender_party_id: int | None = None
     new_sender_name: str = ""

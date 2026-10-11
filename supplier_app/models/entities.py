@@ -48,6 +48,27 @@ class Category:
 
 
 @dataclass
+class Company:
+    """One of the user's own legal entities (Gesellschaft)."""
+
+    name: str
+    id: int | None = None
+    notes: str = ""
+    created_at: str = ""
+
+
+@dataclass
+class Hotel:
+    """A hotel belongs to exactly one company."""
+
+    name: str
+    company_id: int
+    id: int | None = None
+    notes: str = ""
+    created_at: str = ""
+
+
+@dataclass
 class Invoice:
     supplier_id: int
     invoice_number: str
@@ -62,6 +83,8 @@ class Invoice:
     status: InvoiceStatus = InvoiceStatus.OPEN
     notes: str = ""
     category_id: int | None = None
+    company_id: int | None = None
+    hotel_id: int | None = None
     created_at: str = ""
 
 
@@ -132,6 +155,8 @@ class Payment:
     iban: str = ""
     notes: str = ""
     document_id: int | None = None
+    company_id: int | None = None
+    hotel_id: int | None = None
     created_at: str = ""
 
 
@@ -190,6 +215,8 @@ class Document:
     confidence: float = 0.0
     supplier_id: int | None = None
     text_source: str = ""  # 'text_layer' | 'ocr' | 'plain' | ''
+    company_id: int | None = None
+    hotel_id: int | None = None
     created_at: str = ""
 
 

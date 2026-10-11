@@ -62,6 +62,9 @@ class DashboardPage(Page):
 
         head = QHBoxLayout()
         head.addWidget(page_title(tr("nav.dashboard")))
+        self.scope_label = QLabel()
+        self.scope_label.setObjectName("ScopeBadge")
+        head.addWidget(self.scope_label)
         head.addStretch(1)
         self.export_btn = QPushButton(tr("dash.export"))
         menu = QMenu(self.export_btn)
@@ -191,7 +194,7 @@ class DashboardPage(Page):
         custom = (self.from_edit.date().toPython(), self.to_edit.date().toPython())
         return DashboardFilter.for_period(period, date.today(), self.supplier.currentData(),
                                           as_of=date(qd.year(), qd.month(), qd.day()),
-                                          custom=custom if period == "custom" else None)
+                                          custom=custom if period == "custom" else None, scope=self.ctrl.scope)
 
     def _filter_changed(self, *_args) -> None:
         if self._building:
@@ -208,6 +211,7 @@ class DashboardPage(Page):
         finally:
             self._building = False
         flt = self.current_filter()
+        self.scope_label.setText(self.svc.organization.label(flt.scope))
         data = self.ctrl.ctx.dashboard.build(flt)
         self.data = data
         theme = self.ctrl.theme

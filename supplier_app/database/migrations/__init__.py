@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from . import m001_core, m002_references_search, m003_reporting_indexes
+from . import m001_core, m002_references_search, m003_reporting_indexes, m004_companies_hotels
 
 
 @dataclass(frozen=True)
@@ -15,6 +15,6 @@ class Migration:
 
 
 ALL_MIGRATIONS: list[Migration] = [
-    Migration(m.VERSION, m.NAME, m.SQL) for m in (m001_core, m002_references_search, m003_reporting_indexes)
+    Migration(m.VERSION, m.NAME, m.SQL) for m in (m001_core, m002_references_search, m003_reporting_indexes, m004_companies_hotels)
 ]
 LATEST_VERSION: int = ALL_MIGRATIONS[-1].version

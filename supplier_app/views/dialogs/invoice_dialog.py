@@ -14,6 +14,7 @@ from supplier_app.util.money import percent_of
 from supplier_app.views.dialogs.forms import button_box, dialog_root, form_layout, message_label
 from supplier_app.views.errors import show_error
 from supplier_app.views.widgets.inputs import MoneyEdit, get_date, make_date_edit, set_date
+from supplier_app.views.widgets.scope_picker import ScopePicker
 
 
 class InvoiceDialog(QDialog):
@@ -22,7 +23,7 @@ class InvoiceDialog(QDialog):
         self.ctrl = ctrl
         self.svc = ctrl.ctx.services
         self.setWindowTitle(tr("invoice.new"))
-        self.resize(480, 480)
+        self.resize(560, 500)
         root = dialog_root(self)
         form = form_layout()
         self.supplier = QComboBox()
@@ -42,8 +43,10 @@ class InvoiceDialog(QDialog):
         for c in self.svc.repos.categories.list():
             self.category.addItem(c.name, c.id)
         self.notes = QLineEdit()
-        for label, w in (("invoice.supplier", self.supplier), ("invoice.number", self.number), ("invoice.date", self.date),
-                         ("invoice.due", self.due), ("invoice.vat_rate", self.vat_rate), ("invoice.net", self.net),
+        self.scope = ScopePicker(self.svc.organization)
+        self.scope.set_values(ctrl.scope.company_id, ctrl.scope.hotel_id)
+        for label, w in (("invoice.supplier", self.supplier), ("org.assignment", self.scope), ("invoice.number", self.number), ("invoice.date", self.date),
+                         ("review.due_label", self.due), ("invoice.vat_rate", self.vat_rate), ("invoice.net", self.net),
                          ("invoice.vat", self.vat), ("invoice.gross", self.gross), ("invoice.category", self.category),
                          ("common.notes", self.notes)):
             form.addRow(tr(label), w)
@@ -79,7 +82,8 @@ class InvoiceDialog(QDialog):
             invoice = self.svc.invoices.create_invoice(
                 self.supplier.currentData(), self.number.text(), get_date(self.date), gross_cents=self.gross.cents(),
                 net_cents=self.net.cents(), vat_cents=self.vat.cents(), vat_rate=self.vat_rate.currentData(),
-                due_date=get_date(self.due), notes=self.notes.text(), category_id=self.category.currentData())
+                due_date=get_date(self.due), notes=self.notes.text(), category_id=self.category.currentData(),
+                company_id=self.scope.company_id, hotel_id=self.scope.hotel_id)
         except SupplierAppError as exc:
             self.error.setText(exc.message)
             self.error.setVisible(True)

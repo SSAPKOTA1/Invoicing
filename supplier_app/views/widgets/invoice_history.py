@@ -23,6 +23,7 @@ from supplier_app.services.history_service import HistoryItem, InvoiceHistory
 from supplier_app.util.dates import format_date
 from supplier_app.util.money import format_cents
 from supplier_app.views.dialogs.amount_dialog import AmountDialog
+from supplier_app.views.dialogs.edit_dialogs import DateDialog, ScopeDialog
 from supplier_app.views.dialogs.notice_dialog import NoticeDialog
 from supplier_app.views.dialogs.payment_dialog import PaymentDialog
 from supplier_app.views.errors import confirm
@@ -101,19 +102,23 @@ class InvoiceHistoryWidget(QWidget):
         case_row.addWidget(self.note_btn)
         case_row.addStretch(1)
         self.header.layout_.addLayout(case_row)
-        actions = QHBoxLayout()
         self.actions: dict[str, object] = {}
-        for key, text, slot, kind in (
-            ("pay", tr("action.payment"), self._pay, "primary"), ("notice", tr("history.add_notice"), self._notice, ""),
-            ("credit", tr("history.credit_note"), self._credit, ""), ("adjust", tr("history.adjust"), self._adjust, ""),
-            ("writeoff", tr("history.write_off"), self._write_off, ""), ("dispute", tr("history.dispute"), self._dispute, ""),
-            ("cancel", tr("history.cancel"), self._cancel, "danger"),
-        ):
-            b = button(text, kind, slot)
-            self.actions[key] = b
-            actions.addWidget(b)
-        actions.addStretch(1)
-        self.header.layout_.addLayout(actions)
+        rows = (
+            (("pay", tr("action.payment"), self._pay, "primary"), ("notice", tr("history.add_notice"), self._notice, ""),
+             ("credit", tr("history.credit_note"), self._credit, ""), ("adjust", tr("history.adjust"), self._adjust, ""),
+             ("writeoff", tr("history.write_off"), self._write_off, "")),
+            (("due", tr("history.change_due"), self._change_due, ""), ("deadline", tr("history.change_deadline"), self._change_deadline, ""),
+             ("scope", tr("history.change_scope"), self._change_scope, ""), ("dispute", tr("history.dispute"), self._dispute, ""),
+             ("cancel", tr("history.cancel"), self._cancel, "danger")),
+        )
+        for group in rows:
+            actions = QHBoxLayout()
+            for key, text, slot, kind in group:
+                b = button(text, kind, slot)
+                self.actions[key] = b
+                actions.addWidget(b)
+            actions.addStretch(1)
+            self.header.layout_.addLayout(actions)
         root.addWidget(self.header)
 
         self.warning_box = QVBoxLayout()
@@ -165,8 +170,9 @@ class InvoiceHistoryWidget(QWidget):
         self.history = h
         inv, bal = h.invoice, h.balance
         self.title.setText(f"{h.supplier_name} – {inv.invoice_number}")
+        where = self.ctrl.ctx.services.organization.item_label(inv.company_id, inv.hotel_id)
         self.subtitle.setText(f"{tr('history.invoice_date')} {format_date(inv.invoice_date)} · "
-                              f"{tr('history.due')} {format_date(inv.due_date)}")
+                              f"{tr('history.due')} {format_date(inv.due_date)} · {tr('org.hotel_company')}: {where}")
         self.status_badge.set_badge(tr(f"status.{bal.status.value}"), status_tone(bal.status.value))
         self.stat_gross.set_value(format_cents(inv.gross_cents))
         self.stat_charges.set_value(format_cents(bal.charges_cents))
@@ -186,7 +192,7 @@ class InvoiceHistoryWidget(QWidget):
             self.warning_box.addWidget(lab)
         self._fill_table(h)
         cancelled = bal.status == InvoiceStatus.CANCELLED
-        for key in ("pay", "notice", "credit", "adjust", "writeoff", "dispute"):
+        for key in ("pay", "notice", "credit", "adjust", "writeoff", "dispute", "due", "scope"):
             self.actions[key].setEnabled(not cancelled)  # type: ignore[attr-defined]
         self.actions["cancel"].setEnabled(not cancelled)  # type: ignore[attr-defined]
         self.actions["dispute"].setText(  # type: ignore[attr-defined]
@@ -194,6 +200,7 @@ class InvoiceHistoryWidget(QWidget):
         self.detail_label.setText("")
         self.compare_table.set_data([], [])
         self.preview.clear()
+        self.actions["deadline"].setEnabled(False)  # type: ignore[attr-defined]
 
     def _load_case(self, h: InvoiceHistory) -> None:
         has_case = h.case is not None
@@ -234,6 +241,7 @@ class InvoiceHistoryWidget(QWidget):
             return
         svc = self.ctrl.ctx.services
         self.compare_table.set_data([], [])
+        self.actions["deadline"].setEnabled(item.kind == "notice" and bool(item.notice_id))  # type: ignore[attr-defined]
         if item.kind == "notice" and item.notice_id:
             rows = svc.dunning.compare_with_calculation(item.notice_id)
             self.compare_table.set_data(
@@ -303,6 +311,35 @@ class InvoiceHistoryWidget(QWidget):
         if dlg.exec():
             cents, day, comment = dlg.values()
             self.ctrl.run(action, self.invoice_id, cents, day, comment, parent=self)
+
+    def _change_due(self) -> None:
+        if not self.history or not self.invoice_id:
+            return
+        inv = self.history.invoice
+        dlg = DateDialog(tr("history.change_due"), tr("review.due_label"), inv.due_date, inv.invoice_date, self)
+        if dlg.exec():
+            self.ctrl.run(self.ctrl.ctx.services.invoices.change_due_date, self.invoice_id, dlg.value(), parent=self,
+                          success=tr("history.due_changed"))
+
+    def _change_scope(self) -> None:
+        if not self.history or not self.invoice_id:
+            return
+        inv = self.history.invoice
+        dlg = ScopeDialog(self.ctrl.ctx.services.organization, inv.company_id, inv.hotel_id, self)
+        if dlg.exec():
+            company_id, hotel_id = dlg.values()
+            self.ctrl.run(self.ctrl.ctx.services.invoices.assign_scope, self.invoice_id, company_id, hotel_id,
+                          parent=self, success=tr("history.scope_changed"))
+
+    def _change_deadline(self) -> None:
+        item = self.table.selected_payload()
+        if not isinstance(item, HistoryItem) or item.kind != "notice" or not item.notice_id:
+            return
+        notice = self.ctrl.ctx.services.dunning.get(item.notice_id)
+        dlg = DateDialog(tr("history.change_deadline"), tr("history.deadline"), notice.new_deadline, notice.notice_date, self)
+        if dlg.exec():
+            self.ctrl.run(self.ctrl.ctx.services.dunning.update_deadline, item.notice_id, dlg.value(), parent=self,
+                          success=tr("history.deadline_changed"))
 
     def _dispute(self) -> None:
         if self.history:

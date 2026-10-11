@@ -28,6 +28,7 @@ QLabel#KpiDelta[tone="bad"] { color: #d33f49; }
 QLabel#SectionTitle { font-size: 11pt; font-weight: 600; }
 QLabel#PageTitle { font-size: 16pt; font-weight: 700; }
 QLabel#Muted, QLabel[muted="true"] { color: #64708a; }
+QLabel#ScopeBadge { padding: 3px 12px; border-radius: 11px; background: #2563eb; color: #ffffff; font-size: 9pt; font-weight: 600; }
 QLabel#Badge { padding: 2px 10px; border-radius: 10px; background: #e2e7f1; font-size: 9pt; font-weight: 600; }
 QLabel#Badge[tone="ok"] { background: #dcf5ea; color: #15885a; }
 QLabel#Badge[tone="warn"] { background: #fff1d6; color: #b86e00; }

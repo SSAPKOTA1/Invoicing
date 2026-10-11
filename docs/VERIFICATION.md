@@ -26,7 +26,9 @@ CI target: GitHub Actions `windows-latest`, Python 3.11 (see the CI section at t
 
 * Ledger invariants: balance = Σ entries; per invoice open costs + interest + principal = balance (`test_ledger_invariants_hold`); `ledger_entries` is protected by triggers (no UPDATE/DELETE) and CHECK constraints (`tests/test_migrations.py`).
 * Corrupt PDF/PNG, encrypted PDF, empty text, missing file, unsupported type, missing Tesseract and locked database produce friendly messages, not crashes (`tests/test_e2e_scenario.py`, `tests/test_ocr.py`, `tests/test_database.py`).
-* UI offscreen workflows: import via worker threads, review panel, payment dialog preview/booking, supplier/invoice/notice dialogs, search popup, drill-down dialogs, exports, settings (`tests/test_ui.py`, 13 tests). Screenshots: `python -m supplier_app --screenshots DIR`.
+* UI offscreen workflows: import via worker threads, review panel, payment dialog preview/booking, supplier/invoice/notice dialogs, search popup, drill-down dialogs, exports, settings (`tests/test_ui.py`). Screenshots: `python -m supplier_app --screenshots DIR`.
+* Companies/hotels: scope filtering equals the sum of its parts (hotels add up to the company, companies to "all") for balances, aging, dashboard, search and reports (`tests/test_scope.py`); UI: header selector filters every page and is restored after a restart, settings management, invoice dialog / review form / history assignment, due-date and deadline edits (`tests/test_ui.py`).
+* Printing: reports are rendered through the print code path into PDF (preview dialog, print dialog and direct PDF), multi-page output with repeated header row and page numbers verified visually (`test_reports_print_preview_and_pdf`).
 * Exported report numbers equal the ledger (`tests/test_reports.py`: CSV, Excel and PDF are parsed back and compared).
 
 ## Known limitations
