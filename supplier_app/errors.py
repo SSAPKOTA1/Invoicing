@@ -1,0 +1,71 @@
+"""Custom exception hierarchy. User-facing messages are written in German and translated by ``tx`` when another language is active."""
+
+from __future__ import annotations
+
+from supplier_app.i18n import tx
+
+
+class SupplierAppError(Exception):
+    """Base class for all application errors; the message is safe to show to the user."""
+
+    def __init__(self, message: str, *, hint: str | None = None) -> None:
+        message = tx(message)
+        hint = tx(hint) if hint else hint
+        super().__init__(message)
+        self.message = message
+        self.hint = hint
+
+    def __str__(self) -> str:
+        return self.message
+
+
+class DatabaseError(SupplierAppError):
+    """Problems opening, locking or migrating the database."""
+
+
+class MigrationError(DatabaseError):
+    """A migration failed; the database was restored from backup."""
+
+
+class NotFoundError(SupplierAppError):
+    """An entity does not exist."""
+
+
+class ValidationError(SupplierAppError):
+    """Invalid user input or inconsistent data."""
+
+
+class AssignmentMissingError(ValidationError):
+    """A document has no invoice assigned. The user may still file it (and assign the invoice later) after a warning."""
+
+
+class AccountRequiredError(ValidationError):
+    """The statement does not say which of the own bank accounts it belongs to; the user has to choose."""
+
+
+class LedgerError(SupplierAppError):
+    """A ledger rule would be violated."""
+
+
+class DuplicateError(SupplierAppError):
+    """The entity (or document) already exists."""
+
+
+class OcrError(SupplierAppError):
+    """Text extraction failed."""
+
+
+class TesseractMissingError(OcrError):
+    """Tesseract could not be found."""
+
+
+class DocumentError(SupplierAppError):
+    """A file cannot be read (corrupt, unsupported, too large)."""
+
+
+class BackupError(SupplierAppError):
+    """Backup or restore failed."""
+
+
+class AuthError(SupplierAppError):
+    """PIN problems (wrong PIN, locked out)."""

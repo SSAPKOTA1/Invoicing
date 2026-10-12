@@ -22,3 +22,7 @@ scans/
 artifacts/
 *.log
 # only generated fixtures under tests/fixtures may be committed
+
+# generated test fixtures are committed
+!tests/fixtures/
+!tests/fixtures/**

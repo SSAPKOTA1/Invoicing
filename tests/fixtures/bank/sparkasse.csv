@@ -1,0 +1,4 @@
+"Auftragskonto";"Buchungstag";"Valutadatum";"Buchungstext";"Verwendungszweck";"Glaeubiger ID";"Mandatsreferenz";"Kundenreferenz (End-to-End)";"Sammlerreferenz";"Lastschrift Ursprungsbetrag";"Auslagenersatz Ruecklastschrift";"Beguenstigter/Zahlungspflichtiger";"Kontonummer/IBAN";"BIC (SWIFT-Code)";"Betrag";"Waehrung";"Info"
+"DE89370400440532013000";"05.03.2024";"05.03.2024";"ONLINE-UEBERWEISUNG";"Rechnung RE-2024/001 Kundennummer 4711";"";"";"NOTPROVIDED";"";"";"";"Mueller Buerobedarf GmbH";"DE02120300000000202051";"BYLADEM1001";"-1.190,00";"EUR";"Umsatz gebucht"
+"DE89370400440532013000";"06.03.2024";"06.03.2024";"GUTSCHRIFT";"Erstattung Zimmer 12";"";"";"";"";"";"";"Gast Meier";"DE44500105175407324931";"INGDDEFFXXX";"250,00";"EUR";"Umsatz gebucht"
+"DE89370400440532013000";"07.03.2024";"07.03.2024";"DAUERAUFTRAG";"Miete Maerz 2024 Hotel Alpenblick";"";"";"";"";"";"";"Hausverwaltung Berger";"DE02100100100006820101";"PBNKDEFF";"-4.500,00";"EUR";"Umsatz gebucht"

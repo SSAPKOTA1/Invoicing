@@ -1,0 +1,5 @@
+Third-party components bundled in the Windows package (see each project for its license text):
+- Python (PSF License), Qt for Python / PySide6 (LGPL-3.0), PyMuPDF (AGPL-3.0 / commercial), Pillow (HPND),
+  OpenCV (Apache-2.0), NumPy (BSD-3-Clause), openpyxl (MIT), ReportLab (BSD), platformdirs (MIT), pytesseract (Apache-2.0),
+  Tesseract OCR (Apache-2.0) with tessdata_fast language data (Apache-2.0).
+Note: PyMuPDF is AGPL-3.0 licensed. Review the licensing implications before distributing this application to third parties.

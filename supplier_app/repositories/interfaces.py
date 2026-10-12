@@ -1,0 +1,406 @@
+"""Abstract repository interfaces (the services depend only on these)."""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from datetime import date
+from typing import Any
+
+from supplier_app.models.entities import (
+    AppUser,
+    AuditLogEntry,
+    BankAccount,
+    BankStatement,
+    BankTransaction,
+    Case,
+    CaseEvent,
+    Category,
+    Company,
+    Document,
+    DocumentReference,
+    DunningNotice,
+    Hotel,
+    InterestRate,
+    Invoice,
+    LedgerEntry,
+    Party,
+    Payment,
+    PaymentAllocation,
+    RecurringInvoice,
+)
+from supplier_app.models.enums import BankTxStatus, InvoiceStatus, PartyRole, ReviewStatus
+from supplier_app.models.scope import Scope
+
+
+class PartyRepository(ABC):
+    @abstractmethod
+    def add(self, party: Party) -> Party: ...
+    @abstractmethod
+    def update(self, party: Party) -> None: ...
+    @abstractmethod
+    def get(self, party_id: int) -> Party | None: ...
+    @abstractmethod
+    def list(self, role: PartyRole | None = None) -> list[Party]: ...
+    @abstractmethod
+    def delete(self, party_id: int) -> None: ...
+    @abstractmethod
+    def find_by_iban(self, iban: str) -> list[Party]: ...
+    @abstractmethod
+    def find_by_vat_id(self, vat_id: str) -> list[Party]: ...
+    @abstractmethod
+    def name_variants(self) -> list[tuple[int, str, str]]:
+        """All (party_id, normalized variant, original variant) incl. aliases."""
+    @abstractmethod
+    def search_names(self, norm_fragment: str) -> list[Party]: ...
+    @abstractmethod
+    def has_dependents(self, party_id: int) -> bool: ...
+
+
+class InvoiceRepository(ABC):
+    @abstractmethod
+    def add(self, invoice: Invoice) -> Invoice: ...
+    @abstractmethod
+    def update(self, invoice: Invoice) -> None: ...
+    @abstractmethod
+    def get(self, invoice_id: int) -> Invoice | None: ...
+    @abstractmethod
+    def get_by_number(self, supplier_id: int, invoice_number: str) -> Invoice | None: ...
+    @abstractmethod
+    def find_by_number_norm(self, norm: str, supplier_id: int | None = None, prefix: bool = False) -> list[Invoice]: ...
+    @abstractmethod
+    def list(
+        self, supplier_id: int | None = None, status: InvoiceStatus | None = None, scope: Scope | None = None
+    ) -> list[Invoice]: ...
+    @abstractmethod
+    def set_status(self, invoice_id: int, status: InvoiceStatus) -> None: ...
+    @abstractmethod
+    def set_scope(self, invoice_id: int, company_id: int | None, hotel_id: int | None) -> None: ...
+    @abstractmethod
+    def set_supplier(self, invoice_id: int, supplier_id: int) -> None: ...
+    @abstractmethod
+    def find_by_gross(self, gross_cents: int, supplier_id: int | None = None) -> list[Invoice]: ...
+
+
+class LedgerRepository(ABC):
+    @abstractmethod
+    def append(self, entry: LedgerEntry) -> LedgerEntry: ...
+    @abstractmethod
+    def get(self, entry_id: int) -> LedgerEntry | None: ...
+    @abstractmethod
+    def list(
+        self,
+        *,
+        invoice_id: int | None = None,
+        supplier_id: int | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        notice_id: int | None = None,
+        payment_id: int | None = None,
+        scope: Scope | None = None,
+    ) -> list[LedgerEntry]: ...
+    @abstractmethod
+    def is_reversed(self, entry_id: int) -> bool: ...
+    @abstractmethod
+    def sums_by_invoice(
+        self, *, as_of: date | None = None, supplier_id: int | None = None, scope: Scope | None = None
+    ) -> list[tuple[int, int, str, int]]:
+        """Rows ``(invoice_id, supplier_id, category_type, total_cents)`` for entries with an invoice."""
+    @abstractmethod
+    def unapplied_by_supplier(self, *, as_of: date | None = None, scope: Scope | None = None) -> dict[int, int]:
+        """Sum of entries without invoice per supplier (negative = credit on account)."""
+    @abstractmethod
+    def balances_by_invoice(
+        self, *, as_of: date | None = None, supplier_id: int | None = None, scope: Scope | None = None
+    ) -> dict[int, int]:
+        """Sum of all entries per invoice (the open balance), one row per invoice."""
+    @abstractmethod
+    def unapplied_entries(
+        self, *, supplier_id: int | None = None, as_of: date | None = None, scope: Scope | None = None
+    ) -> list[LedgerEntry]:
+        """Not yet reversed PAYMENT entries without invoice (credit on account)."""
+    @abstractmethod
+    def sums_by_type(
+        self,
+        *,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        supplier_id: int | None = None,
+        month_buckets: bool = False,
+        scope: Scope | None = None,
+    ) -> list[tuple[str, str, int]]:
+        """Rows ``(bucket, category_type, total)``; bucket is ``YYYY-MM`` or ``''``."""
+    @abstractmethod
+    def count(self) -> int: ...
+
+
+class NoticeRepository(ABC):
+    @abstractmethod
+    def add(self, notice: DunningNotice, dedup_key: str) -> DunningNotice: ...
+    @abstractmethod
+    def get(self, notice_id: int) -> DunningNotice | None: ...
+    @abstractmethod
+    def find_by_dedup_key(self, key: str) -> DunningNotice | None: ...
+    @abstractmethod
+    def list(
+        self, *, supplier_id: int | None = None, invoice_id: int | None = None, case_id: int | None = None,
+        scope: Scope | None = None,
+    ) -> list[DunningNotice]: ...
+    @abstractmethod
+    def set_case(self, notice_id: int, case_id: int | None) -> None: ...
+    @abstractmethod
+    def set_deadline(self, notice_id: int, deadline: date | None) -> None: ...
+    @abstractmethod
+    def set_sender(self, notice_id: int, sender_party_id: int) -> None: ...
+
+
+class PaymentRepository(ABC):
+    @abstractmethod
+    def add(self, payment: Payment) -> Payment: ...
+    @abstractmethod
+    def get(self, payment_id: int) -> Payment | None: ...
+    @abstractmethod
+    def list(
+        self, *, supplier_id: int | None = None, date_from: date | None = None, date_to: date | None = None,
+        scope: Scope | None = None,
+    ) -> list[Payment]: ...
+    @abstractmethod
+    def add_allocation(self, alloc: PaymentAllocation) -> PaymentAllocation: ...
+    @abstractmethod
+    def allocations(
+        self, *, payment_id: int | None = None, invoice_id: int | None = None
+    ) -> list[PaymentAllocation]: ...
+    @abstractmethod
+    def allocation_sums(self, *, as_of: date | None = None, scope: Scope | None = None) -> list[tuple[int, str, int]]:
+        """Rows ``(invoice_id, component, total)`` of allocations booked up to ``as_of``."""
+
+
+class DocumentRepository(ABC):
+    @abstractmethod
+    def add(self, doc: Document) -> Document: ...
+    @abstractmethod
+    def get(self, doc_id: int) -> Document | None: ...
+    @abstractmethod
+    def get_by_hash(self, sha256: str) -> Document | None: ...
+    @abstractmethod
+    def update(self, doc: Document) -> None: ...
+    @abstractmethod
+    def set_scope(self, doc_id: int, company_id: int | None, hotel_id: int | None) -> None: ...
+    @abstractmethod
+    def list(
+        self, *, review_status: ReviewStatus | None = None, supplier_id: int | None = None, limit: int | None = None,
+        scope: Scope | None = None, assignment_pending: bool | None = None,
+    ) -> list[Document]: ...
+    @abstractmethod
+    def save_file(self, doc_id: int, content: bytes) -> None:
+        """Keep the document file itself in the database (multi-user mode: all users see the same files)."""
+    @abstractmethod
+    def load_file(self, doc_id: int) -> bytes | None: ...
+    @abstractmethod
+    def fulltext(self, fts_query: str, limit: int = 50) -> list[tuple[int, str]]:
+        """``(document_id, snippet)`` for an FTS5 query."""
+    @abstractmethod
+    def count_by_status(self) -> dict[str, int]: ...
+
+
+class ReferenceRepository(ABC):
+    @abstractmethod
+    def add(self, ref: DocumentReference) -> DocumentReference | None:
+        """Insert unless an identical reference exists (returns ``None`` then)."""
+    @abstractmethod
+    def for_owner(self, owner_kind: str, owner_id: int) -> list[DocumentReference]: ...
+    @abstractmethod
+    def find(self, normalized: str, *, prefix: bool = False) -> list[DocumentReference]: ...
+
+
+class CaseRepository(ABC):
+    @abstractmethod
+    def add(self, case: Case) -> Case: ...
+    @abstractmethod
+    def get(self, case_id: int) -> Case | None: ...
+    @abstractmethod
+    def get_by_invoice(self, invoice_id: int) -> Case | None: ...
+    @abstractmethod
+    def update(self, case: Case) -> None: ...
+    @abstractmethod
+    def set_supplier(self, case_id: int, supplier_id: int) -> None: ...
+    @abstractmethod
+    def list(
+        self, *, supplier_id: int | None = None, status: str | None = None, scope: Scope | None = None
+    ) -> list[Case]: ...
+    @abstractmethod
+    def add_event(self, event: CaseEvent) -> CaseEvent: ...
+    @abstractmethod
+    def events(self, case_id: int) -> list[CaseEvent]: ...
+
+
+class SettingsRepository(ABC):
+    @abstractmethod
+    def get(self, key: str, default: str | None = None) -> str | None: ...
+    @abstractmethod
+    def set(self, key: str, value: str) -> None: ...
+    @abstractmethod
+    def delete(self, key: str) -> None: ...
+    @abstractmethod
+    def all(self) -> dict[str, str]: ...
+
+
+class RateRepository(ABC):
+    @abstractmethod
+    def list(self) -> list[InterestRate]: ...
+    @abstractmethod
+    def upsert(self, rate: InterestRate) -> None: ...
+    @abstractmethod
+    def delete(self, valid_from: date) -> None: ...
+
+
+class CategoryRepository(ABC):
+    @abstractmethod
+    def list(self) -> list[Category]: ...
+    @abstractmethod
+    def add(self, name: str) -> Category: ...
+    @abstractmethod
+    def delete(self, category_id: int) -> None: ...
+
+
+class AuditRepository(ABC):
+    @abstractmethod
+    def add(self, entry: AuditLogEntry) -> AuditLogEntry: ...
+    @abstractmethod
+    def list(self, *, limit: int = 200, entity: str | None = None) -> list[AuditLogEntry]: ...
+
+
+class UserRepository(ABC):
+    """Logins of the multi-user mode."""
+
+    @abstractmethod
+    def add(self, user: AppUser) -> AppUser: ...
+    @abstractmethod
+    def update(self, user: AppUser) -> None: ...
+    @abstractmethod
+    def get(self, user_id: int) -> AppUser | None: ...
+    @abstractmethod
+    def get_by_username(self, username: str) -> AppUser | None: ...
+    @abstractmethod
+    def list(self) -> list[AppUser]: ...
+    @abstractmethod
+    def count(self) -> int: ...
+    @abstractmethod
+    def delete(self, user_id: int) -> None: ...
+
+
+class OrganizationRepository(ABC):
+    """Own companies (Gesellschaften) and their hotels."""
+
+    @abstractmethod
+    def add_company(self, company: Company) -> Company: ...
+    @abstractmethod
+    def update_company(self, company: Company) -> None: ...
+    @abstractmethod
+    def get_company(self, company_id: int) -> Company | None: ...
+    @abstractmethod
+    def companies(self) -> list[Company]: ...
+    @abstractmethod
+    def delete_company(self, company_id: int) -> None: ...
+    @abstractmethod
+    def add_hotel(self, hotel: Hotel) -> Hotel: ...
+    @abstractmethod
+    def update_hotel(self, hotel: Hotel) -> None: ...
+    @abstractmethod
+    def get_hotel(self, hotel_id: int) -> Hotel | None: ...
+    @abstractmethod
+    def hotels(self, company_id: int | None = None) -> list[Hotel]: ...
+    @abstractmethod
+    def delete_hotel(self, hotel_id: int) -> None: ...
+    @abstractmethod
+    def hotel_has_items(self, hotel_id: int) -> bool: ...
+    @abstractmethod
+    def company_has_items(self, company_id: int) -> bool: ...
+
+
+class RecurringRepository(ABC):
+    @abstractmethod
+    def add(self, rec: RecurringInvoice) -> RecurringInvoice: ...
+    @abstractmethod
+    def update(self, rec: RecurringInvoice) -> None: ...
+    @abstractmethod
+    def get(self, rec_id: int) -> RecurringInvoice | None: ...
+    @abstractmethod
+    def list(self, *, supplier_id: int | None = None, active_only: bool = False) -> list[RecurringInvoice]: ...
+    @abstractmethod
+    def delete(self, rec_id: int) -> None: ...
+    @abstractmethod
+    def log_run(self, rec_id: int, occurrence: date, invoice_id: int) -> bool:
+        """Remember that the invoice of ``occurrence`` exists; False when the occurrence was already generated."""
+    @abstractmethod
+    def runs(self, rec_id: int) -> dict[date, int]:
+        """occurrence -> invoice id"""
+    @abstractmethod
+    def template_of_invoice(self, invoice_id: int) -> int | None: ...
+
+
+class BankRepository(ABC):
+    @abstractmethod
+    def add_account(self, account: BankAccount) -> BankAccount: ...
+    @abstractmethod
+    def update_account(self, account: BankAccount) -> None: ...
+    @abstractmethod
+    def get_account(self, account_id: int) -> BankAccount | None: ...
+    @abstractmethod
+    def account_by_iban(self, iban: str) -> BankAccount | None: ...
+    @abstractmethod
+    def accounts(self) -> list[BankAccount]: ...
+    @abstractmethod
+    def delete_account(self, account_id: int) -> None: ...
+    @abstractmethod
+    def add_statement(self, statement: BankStatement) -> BankStatement: ...
+    @abstractmethod
+    def update_statement(self, statement: BankStatement) -> None: ...
+    @abstractmethod
+    def statement_by_hash(self, file_hash: str) -> BankStatement | None: ...
+    @abstractmethod
+    def statements(self) -> list[BankStatement]: ...
+    @abstractmethod
+    def add_transaction(self, tx: BankTransaction) -> BankTransaction: ...
+    @abstractmethod
+    def update_transaction(self, tx: BankTransaction) -> None: ...
+    @abstractmethod
+    def get_transaction(self, tx_id: int) -> BankTransaction | None: ...
+    @abstractmethod
+    def existing_fingerprints(self, fingerprints: list[str]) -> set[str]: ...
+    @abstractmethod
+    def transactions(
+        self, *, status: BankTxStatus | None = None, account_id: int | None = None, statement_id: int | None = None,
+        supplier_id: int | None = None,
+    ) -> list[BankTransaction]: ...
+    @abstractmethod
+    def count_by_status(self) -> dict[str, int]: ...
+    @abstractmethod
+    def by_payment(self, payment_id: int) -> BankTransaction | None: ...
+    @abstractmethod
+    def release_payment(self, payment_id: int) -> None:
+        """The payment was reversed: the transaction waits for a new decision."""
+
+
+class Repositories(ABC):
+    """Bundle of all repositories plus the transaction scope."""
+
+    parties: PartyRepository
+    invoices: InvoiceRepository
+    ledger: LedgerRepository
+    notices: NoticeRepository
+    payments: PaymentRepository
+    documents: DocumentRepository
+    references: ReferenceRepository
+    cases: CaseRepository
+    settings: SettingsRepository
+    rates: RateRepository
+    categories: CategoryRepository
+    audit: AuditRepository
+    organization: OrganizationRepository
+    users: UserRepository
+    recurring: RecurringRepository
+    bank: BankRepository
+
+    @abstractmethod
+    def transaction(self) -> Any:
+        """Context manager for an atomic unit of work."""
