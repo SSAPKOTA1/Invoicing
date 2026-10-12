@@ -17,6 +17,7 @@ from supplier_app.services.ledger_service import LedgerService
 from supplier_app.services.organization_service import OrganizationService
 from supplier_app.services.payment_service import PaymentService
 from supplier_app.services.pin_service import PinService
+from supplier_app.services.recurring_service import RecurringService
 from supplier_app.services.search_service import SearchService
 from supplier_app.services.session import Session
 from supplier_app.services.settings_service import SettingsService
@@ -42,6 +43,7 @@ class Services:
     backup: BackupService
     ingest: IngestService
     organization: OrganizationService
+    recurring: RecurringService
     users: UserService
     session: Session
 
@@ -79,6 +81,7 @@ def build_services(storage: Storage, *, multi_user: bool = False, prefs: LocalPr
         backup=BackupService(storage.db, storage.paths),
         ingest=ingest,
         organization=OrganizationService(repos),
+        recurring=RecurringService(repos, invoices),
         users=UserService(repos, session),
         session=session,
     )

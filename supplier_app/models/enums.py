@@ -13,6 +13,19 @@ class UserRole(str, Enum):
     VIEWER = "viewer"
 
 
+class RecurrencePeriod(str, Enum):
+    """How often a recurring invoice (rent ...) falls due."""
+
+    MONTHLY = "monthly"
+    QUARTERLY = "quarterly"
+    HALF_YEARLY = "half_yearly"
+    YEARLY = "yearly"
+
+    @property
+    def months(self) -> int:
+        return {"monthly": 1, "quarterly": 3, "half_yearly": 6, "yearly": 12}[self.value]
+
+
 class PartyRole(str, Enum):
     SUPPLIER = "supplier"
     COLLECTION_AGENCY = "collection_agency"

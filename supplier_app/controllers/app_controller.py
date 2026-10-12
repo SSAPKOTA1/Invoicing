@@ -9,7 +9,7 @@ from typing import Any
 from PySide6.QtCore import QEvent, QObject, QTimer, Signal
 from PySide6.QtWidgets import QApplication
 
-from supplier_app.i18n import tx
+from supplier_app.i18n import tr, tx
 from supplier_app.main import AppContext
 from supplier_app.models.scope import ALL, Scope
 from supplier_app.views.theme import apply_theme
@@ -55,6 +55,8 @@ class AppController(QObject):
         self._polls = 0
         self._poll = QTimer(self)
         self._poll.timeout.connect(self.poll_changes)
+        self._recurring = QTimer(self)
+        self._recurring.timeout.connect(self.generate_recurring)
 
     @property
     def multi_user(self) -> bool:
@@ -71,6 +73,26 @@ class AppController(QObject):
             self._last_version = self._read_version()
             self._poll.start(interval_ms)
             self.register_session()
+
+    def start_recurring(self, interval_ms: int = 3_600_000) -> None:
+        """Book the recurring invoices (rent ...) that fell due: shortly after the start and then every hour."""
+        QTimer.singleShot(2000, self.generate_recurring)
+        self._recurring.start(interval_ms)
+
+    def generate_recurring(self) -> int:
+        """Returns the number of invoices generated (0 also when the user may not write or something failed)."""
+        svc = self.ctx.services
+        if not svc.session.can_write or not svc.recurring.list(active_only=True):
+            return 0
+        try:
+            report = svc.recurring.generate_due()
+        except Exception:  # noqa: BLE001 - a colleague may be generating the same invoices; the next run retries
+            log.warning("recurring invoices could not be generated", exc_info=True)
+            return 0
+        if report.created:
+            self.status.emit(tr("recurring.generated", n=len(report.created)))
+            self.notify_changed()
+        return len(report.created)
 
     def register_session(self) -> None:
         """Shared folder mode: tell the colleagues who is connected (heartbeat file in the shared folder)."""
@@ -107,6 +129,7 @@ class AppController(QObject):
         """Detach from the application (tests and clean exit)."""
         self._idle.stop()
         self._poll.stop()
+        self._recurring.stop()
         if self.ctx.registry is not None:
             self.ctx.registry.unregister()
         self.app.removeEventFilter(self)

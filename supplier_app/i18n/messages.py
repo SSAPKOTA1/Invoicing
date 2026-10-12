@@ -434,3 +434,20 @@ EN.update({
     "Das Schreiben gehört zum Lieferanten '{name}'. Als Absender kommen dieser Lieferant oder ein von ihm beauftragtes Inkassobüro in Frage.":
         "The letter belongs to the supplier '{name}'. Its sender can be this supplier or a collection agency it has appointed.",
 })
+
+EN.update({
+    "Wiederkehrende Rechnung nicht gefunden.": "Recurring invoice not found.",
+    "Bitte eine Bezeichnung angeben (z. B. Miete Hotel Alpenblick).": "Please enter a name (e.g. Rent Hotel Alpenblick).",
+    "Der Tag im Monat muss zwischen 1 und 31 liegen.": "The day of the month must be between 1 and 31.",
+    "Das Ende liegt vor dem Beginn.": "The end is before the start.",
+    "Das Zahlungsziel darf nicht negativ sein.": "The payment term must not be negative.",
+    "Der MwSt-Satz muss zwischen 0 und 100 liegen.": "The VAT rate must be between 0 and 100.",
+    "Bitte mindestens einen Betrag größer als 0 angeben.": "Please enter at least one amount greater than 0.",
+    "Zwei Beträge gelten ab dem gleichen Datum.": "Two amounts apply from the same date.",
+    "Der erste Betrag muss ab dem Beginn der Rechnung gelten.": "The first amount must apply from the start.",
+    "Unbekannter Platzhalter in der Rechnungsnummer: {name}": "Unknown placeholder in the invoice number: {name}",
+    "Die Rechnungsnummer muss sich mit jedem Zeitraum ändern (z. B. {year}-{month}).":
+        "The invoice number must change with every period (e.g. {year}-{month}).",
+    "Die wiederkehrende Rechnung ist ungültig oder doppelt (Beträge mit gleichem Datum?).":
+        "The recurring invoice is invalid or duplicated (amounts with the same date?).",
+})

@@ -658,3 +658,30 @@ def test_settings_vocabulary_card_saves_and_reloads(win, demo_ctx) -> None:
     sp.vocab_edits["gross"].setText("")
     sp.refresh()
     assert sp.vocab_edits["gross"].text() == "Zahlungsbetrag, Rechnungs-Endbetrag"
+
+
+def test_recurring_invoice_dialog_tab_and_supplier_change(win, demo_ctx, monkeypatch) -> None:
+    from supplier_app.views.dialogs.recurring_dialog import RecurringDialog
+    from supplier_app.views.widgets.party_picker import PartyChangeDialog
+    app, ctrl, window = win
+    svc = demo_ctx.services
+    landlord = svc.suppliers.suppliers()[0]
+    dlg = RecurringDialog(ctrl, landlord.id)
+    dlg.title_edit.setText("Miete Hotel")
+    dlg.amounts.cellWidget(0, 1).setText("4.500,00")
+    assert "MIETE-" in dlg.preview.text()
+    dlg.accept()
+    assert dlg.saved and svc.recurring.list(supplier_id=landlord.id)
+    bad = RecurringDialog(ctrl, landlord.id)
+    bad.accept()  # no name, no amount
+    assert not bad.error.isHidden()
+    page = window.pages["suppliers"]
+    page.select_supplier(landlord.id)
+    page.refresh()
+    assert page.recurring.row_count() == 1
+    page.recurring.select_payload(dlg.saved.id)
+    page.generate_recurring()
+    assert svc.recurring.runs(dlg.saved.id)
+    assert ctrl.generate_recurring() == 0  # nothing new
+    chooser = PartyChangeDialog("t", "hint", svc.suppliers.suppliers(), landlord.id)
+    assert chooser.party_id() == landlord.id

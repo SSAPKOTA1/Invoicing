@@ -24,6 +24,7 @@ from supplier_app.util.dates import format_date
 from supplier_app.util.money import format_cents
 from supplier_app.views.dialogs.invoice_dialog import InvoiceDialog
 from supplier_app.views.dialogs.payment_dialog import PaymentDialog
+from supplier_app.views.dialogs.recurring_dialog import RecurringDialog
 from supplier_app.views.dialogs.supplier_dialog import SupplierDialog
 from supplier_app.views.errors import confirm
 from supplier_app.views.pages.base import Page
@@ -87,6 +88,7 @@ class SuppliersPage(Page):
         self.documents = DataTable()
         self.documents.row_activated.connect(lambda did: did and self.ctrl.open_document.emit(did))
         self.tabs.addTab(self.documents, tr("suppliers.tab.documents"))
+        self.tabs.addTab(self._build_recurring_tab(), tr("suppliers.tab.recurring"))
         self.master = QLabel()
         self.master.setWordWrap(True)
         self.master.setTextFormat(Qt.TextFormat.RichText)
@@ -130,6 +132,23 @@ class SuppliersPage(Page):
         self.aging_label = QLabel()
         self.aging_label.setTextFormat(Qt.TextFormat.RichText)
         lay.addWidget(self.aging_label)
+        return w
+
+    def _build_recurring_tab(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(8, 8, 8, 8)
+        bar = QHBoxLayout()
+        bar.addWidget(button(tr("recurring.new"), "primary", self.new_recurring))
+        bar.addWidget(button(tr("common.edit"), "", self.edit_recurring))
+        bar.addWidget(button(tr("recurring.activate"), "", self.toggle_recurring))
+        bar.addWidget(button(tr("recurring.generate"), "", self.generate_recurring))
+        bar.addWidget(button(tr("common.delete"), "danger", self.delete_recurring))
+        bar.addStretch(1)
+        lay.addLayout(bar)
+        self.recurring = DataTable()
+        self.recurring.row_activated.connect(lambda _rid: self.edit_recurring())
+        lay.addWidget(self.recurring, 1)
         return w
 
     def _set_enabled(self, on: bool) -> None:
@@ -192,7 +211,7 @@ class SuppliersPage(Page):
         self._set_enabled(sid is not None)
         if sid is None:
             self.header.setText(tr("suppliers.select"))
-            for t in (self.statement, self.invoices, self.notices, self.documents):
+            for t in (self.statement, self.invoices, self.notices, self.documents, self.recurring):
                 t.set_data([], [])
             self.totals.setText("")
             self.aging_label.setText("")
@@ -208,6 +227,7 @@ class SuppliersPage(Page):
         self._load_invoices(sid)
         self._load_notices(sid)
         self._load_documents(sid)
+        self._load_recurring(sid)
         self._load_master(sid)
 
     def _load_statement(self, sid: int) -> None:
@@ -288,6 +308,23 @@ class SuppliersPage(Page):
                      tr(f"review.{d.review_status.value}")], d.id) for d in self.svc.repos.documents.list(supplier_id=sid, scope=self.ctrl.scope)]
         self.documents.set_data([tr("doc.name"), tr("doc.type"), tr("doc.confidence"), tr("doc.status")], rows, [320, 160, 90, 120])
 
+    def _load_recurring(self, sid: int) -> None:
+        svc = self.svc
+        rows = []
+        for rec in svc.recurring.list(supplier_id=sid):
+            runs = svc.recurring.runs(rec.id or 0)
+            nxt = next(iter(svc.recurring.upcoming(rec, 1)), None)
+            ended = bool(rec.end_date and rec.end_date < date.today())
+            status = "ended" if ended else "active" if rec.active else "paused"
+            amount = svc.recurring.amount_on(rec, date.today())
+            rows.append(Row([rec.title, tr(f"recurring.period.{rec.period.value}"),
+                             Cell(format_cents(amount) if amount else "–", amount or 0, "right"),
+                             format_date(nxt[0]) if nxt and rec.active else "–", str(len(runs)),
+                             Cell(tr(f"recurring.status.{status}"), tone="ok" if status == "active" else "muted")], rec.id))
+        self.recurring.set_data([tr("recurring.col.title"), tr("recurring.col.period"), tr("recurring.col.amount"),
+                                 tr("recurring.col.next"), tr("recurring.col.runs"),
+                                 tr("recurring.col.status")], rows, [230, 110, 120, 110, 100, 90])
+
     def _load_master(self, sid: int) -> None:
         p = self.svc.suppliers.get(sid)
         rep = ""
@@ -318,6 +355,38 @@ class SuppliersPage(Page):
             if self.ctrl.run(self.svc.suppliers.delete, self.supplier_id, parent=self):
                 self.supplier_id = None
                 self.refresh()
+
+    def new_recurring(self) -> None:
+        if self.supplier_id and RecurringDialog(self.ctrl, self.supplier_id, parent=self).exec():
+            self.refresh()
+
+    def _selected_recurring(self) -> int | None:
+        rid = self.recurring.selected_payload()
+        return int(rid) if rid else None
+
+    def edit_recurring(self) -> None:
+        rid = self._selected_recurring()
+        if rid and RecurringDialog(self.ctrl, rec=self.svc.recurring.get(rid), parent=self).exec():
+            self.refresh()
+
+    def toggle_recurring(self) -> None:
+        rid = self._selected_recurring()
+        if rid:
+            self.ctrl.run(self.svc.recurring.set_active, rid, not self.svc.recurring.get(rid).active, parent=self)
+
+    def generate_recurring(self) -> None:
+        rid = self._selected_recurring()
+        if not rid:
+            return
+        report = self.ctrl.run(self.svc.recurring.generate_due, None, rid, parent=self)
+        if report is not None and report is not True:
+            self.ctrl.status.emit(tr("recurring.generated", n=len(report.created)) if report.created
+                                  else tr("recurring.generated.none"))
+
+    def delete_recurring(self) -> None:
+        rid = self._selected_recurring()
+        if rid and confirm(self, tr("recurring.delete.confirm", title=self.svc.recurring.get(rid).title)):
+            self.ctrl.run(self.svc.recurring.delete, rid, parent=self)
 
     def new_invoice(self) -> None:
         InvoiceDialog(self.ctrl, self.supplier_id, self).exec()

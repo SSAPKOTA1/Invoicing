@@ -23,6 +23,7 @@ from supplier_app.models.entities import (
     Party,
     Payment,
     PaymentAllocation,
+    RecurringInvoice,
 )
 from supplier_app.models.enums import InvoiceStatus, PartyRole, ReviewStatus
 from supplier_app.models.scope import Scope
@@ -313,6 +314,27 @@ class OrganizationRepository(ABC):
     def company_has_items(self, company_id: int) -> bool: ...
 
 
+class RecurringRepository(ABC):
+    @abstractmethod
+    def add(self, rec: RecurringInvoice) -> RecurringInvoice: ...
+    @abstractmethod
+    def update(self, rec: RecurringInvoice) -> None: ...
+    @abstractmethod
+    def get(self, rec_id: int) -> RecurringInvoice | None: ...
+    @abstractmethod
+    def list(self, *, supplier_id: int | None = None, active_only: bool = False) -> list[RecurringInvoice]: ...
+    @abstractmethod
+    def delete(self, rec_id: int) -> None: ...
+    @abstractmethod
+    def log_run(self, rec_id: int, occurrence: date, invoice_id: int) -> bool:
+        """Remember that the invoice of ``occurrence`` exists; False when the occurrence was already generated."""
+    @abstractmethod
+    def runs(self, rec_id: int) -> dict[date, int]:
+        """occurrence -> invoice id"""
+    @abstractmethod
+    def template_of_invoice(self, invoice_id: int) -> int | None: ...
+
+
 class Repositories(ABC):
     """Bundle of all repositories plus the transaction scope."""
 
@@ -330,6 +352,7 @@ class Repositories(ABC):
     audit: AuditRepository
     organization: OrganizationRepository
     users: UserRepository
+    recurring: RecurringRepository
 
     @abstractmethod
     def transaction(self) -> Any:

@@ -15,6 +15,7 @@ from .enums import (
     LedgerEntryType,
     PartyRole,
     PaymentMethod,
+    RecurrencePeriod,
     ReferenceType,
     ReviewStatus,
     UserRole,
@@ -260,3 +261,34 @@ class AuditLogEntry:
     id: int | None = None
     created_at: str = ""
     username: str = ""
+
+
+@dataclass
+class RecurringAmount:
+    """The gross amount that applies from ``valid_from`` on (a rent increase adds a new row)."""
+
+    valid_from: date
+    gross_cents: int
+
+
+@dataclass
+class RecurringInvoice:
+    """Template for an invoice that repeats: rent, leasing, maintenance contracts ..."""
+
+    supplier_id: int
+    title: str
+    period: RecurrencePeriod
+    start_date: date
+    id: int | None = None
+    day_of_month: int = 1  # 1..31; 31 = last day of the month
+    end_date: date | None = None
+    due_days: int = 0
+    number_pattern: str = ""  # tokens: {year} {month} {quarter} {half} {title}
+    vat_rate: Decimal = Decimal("0")
+    notes: str = ""
+    category_id: int | None = None
+    company_id: int | None = None
+    hotel_id: int | None = None
+    active: bool = True
+    amounts: list[RecurringAmount] = field(default_factory=list)
+    created_at: str = ""

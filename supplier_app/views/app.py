@@ -85,6 +85,7 @@ def run_application() -> int:
     window.show()
     ctrl.restart_idle_timer()
     ctrl.start_polling()
+    ctrl.start_recurring()
     code = app.exec()
     ctx.close()
     return code

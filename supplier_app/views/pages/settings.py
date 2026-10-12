@@ -253,6 +253,12 @@ class SettingsPage(Page):
             self.ref_edits[t] = edit
             form.addRow(tr(f"ref.{t.value}"), edit)
         card.layout_.addLayout(form)
+        card.add(muted(tr("settings.own_names.hint")))
+        self.own_names = QLineEdit()
+        self.own_names.setPlaceholderText(tr("settings.references.placeholder"))
+        own = QFormLayout()
+        own.addRow(tr("settings.own_names"), self.own_names)
+        card.layout_.addLayout(own)
         card.add(button(tr("common.save"), "primary", self._save_refs))
         return card
 
@@ -429,6 +435,7 @@ class SettingsPage(Page):
         rules = s.reference_rules()
         for t, edit in self.ref_edits.items():
             edit.setText(", ".join(rules.get(t.value, [])))
+        self.own_names.setText(", ".join(x.strip() for x in s.get("own_names").splitlines() if x.strip()))
         vocab = s.custom_vocab()
         for key, edit in self.vocab_edits.items():
             edit.setText(", ".join(vocab.get(key, [])))
@@ -575,6 +582,7 @@ class SettingsPage(Page):
     def _save_refs(self) -> None:
         rules = {t.value: [w.strip() for w in e.text().split(",") if w.strip()] for t, e in self.ref_edits.items()}
         self.svc.settings.set_reference_rules({k: v for k, v in rules.items() if v})
+        self.svc.settings.set("own_names", "\n".join(w.strip() for w in self.own_names.text().split(",") if w.strip()))
         self.ctrl.status.emit(tr("settings.saved"))
 
     def create_backup(self) -> None:
