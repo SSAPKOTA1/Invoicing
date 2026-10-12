@@ -1,22 +1,23 @@
-"""PostgreSQL implementation of :class:`OrganizationRepository` (companies and hotels)."""
+"""SQLite implementation of :class:`OrganizationRepository` (companies and hotels)."""
 
 from __future__ import annotations
 
+import sqlite3
+
 from supplier_app.database.errors import INTEGRITY_ERRORS
-from supplier_app.database.pg import Row
 from supplier_app.errors import DuplicateError, NotFoundError
 from supplier_app.models.entities import Company, Hotel
 from supplier_app.repositories.interfaces import OrganizationRepository
-from supplier_app.repositories.pg_base import PgRepo, stamp
+from supplier_app.repositories.sqlite_base import SqliteRepo, stamp
 
 
-class PgOrganizationRepository(PgRepo, OrganizationRepository):
+class SqliteOrganizationRepository(SqliteRepo, OrganizationRepository):
     @staticmethod
-    def _company(row: Row) -> Company:
+    def _company(row: sqlite3.Row) -> Company:
         return Company(id=row["id"], name=row["name"], notes=row["notes"], created_at=row["created_at"])
 
     @staticmethod
-    def _hotel(row: Row) -> Hotel:
+    def _hotel(row: sqlite3.Row) -> Hotel:
         return Hotel(id=row["id"], company_id=row["company_id"], name=row["name"], notes=row["notes"],
                      created_at=row["created_at"])
 

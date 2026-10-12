@@ -5,7 +5,11 @@ from __future__ import annotations
 import base64
 import json
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import Any
+
+from supplier_app.errors import BackupError, DatabaseError
+from supplier_app.settings.local_prefs import PER_USER_KEYS
 
 #: parents before children (foreign keys); ledger entries are ordered by id so reversals come after their originals
 TABLES = [
@@ -56,7 +60,9 @@ def _insert(db: Any, table: str, row: dict[str, Any], *, skip: str | None = None
 
 
 def clear_database(db: Any) -> None:
-    """Remove all rows (TRUNCATE ignores the append-only ledger trigger); keeps the schema."""
+    """Remove all rows (PostgreSQL TRUNCATE ignores the append-only ledger trigger); keeps the schema."""
+    if db.backend != "postgres":
+        raise DatabaseError("Das Leeren der Datenbank ist nur für den Server-Modus vorgesehen.")
     db.execute("TRUNCATE " + ", ".join(TABLES) + " RESTART IDENTITY CASCADE")
 
 
@@ -80,8 +86,9 @@ def load_tables(db: Any, rows_by_table: Callable[[str], Iterator[dict[str, Any]]
                 total += 1
             for pid, target in pending:
                 db.execute(f"UPDATE {table} SET {link}=? WHERE id=?", (target, pid))
-        reset_sequences(db)
-        db.execute("UPDATE data_version SET version = version + 1 WHERE id = 1")
+        if db.backend == "postgres":
+            reset_sequences(db)
+            db.execute("UPDATE data_version SET version = version + 1 WHERE id = 1")
     return total
 
 
@@ -92,3 +99,29 @@ def reset_sequences(db: Any) -> None:
             continue
         db.execute(
             f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE(MAX(id), 1), MAX(id) IS NOT NULL) FROM {table}")
+
+
+def _local_document_files(source: Any, documents_dir: Path) -> Iterator[dict[str, Any]]:
+    for row in source.query_all("SELECT id, stored_path FROM documents ORDER BY id"):
+        path = documents_dir / row["stored_path"]
+        if path.is_file():
+            yield {"document_id": row["id"], "content": path.read_bytes()}
+
+
+def copy_database(source: Any, target: Any, documents_dir: Path | None = None,
+                  progress: Callable[[str], None] | None = None) -> int:
+    """Copy all data from one database to an empty one (local SQLite -> server). The document files of the local
+    documents folder become ``document_files`` rows. PIN and personal preferences are not copied."""
+    if not is_empty(target):
+        raise BackupError("Die Ziel-Datenbank enthält bereits Daten und wird nicht überschrieben.")
+
+    def rows(table: str) -> Iterator[dict[str, Any]]:
+        if table == "document_files" and documents_dir is not None:
+            return _local_document_files(source, documents_dir)
+        if table == "settings":
+            return (r for r in iter_rows(source, table) if not r["key"].startswith("pin_") and r["key"] not in PER_USER_KEYS)
+        if table == "app_users":
+            return iter(())
+        return iter_rows(source, table)
+
+    return load_tables(target, rows, progress)

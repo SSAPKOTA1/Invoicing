@@ -1,9 +1,9 @@
-"""PostgreSQL access: one connection per running program, statements with ``?`` placeholders, explicit transactions.
+"""PostgreSQL backend (multi-user server mode) with the same interface as :class:`Database`.
 
-* statements are written with ``?`` placeholders and translated here
-* rows support ``row["name"]`` and ``row[0]``
-* every top-level transaction takes a global advisory lock, so writers are serialised
-  (no lost updates between users, payments cannot be allocated twice)
+* statements are written with ``?`` placeholders like for SQLite and translated here
+* rows support ``row["name"]`` and ``row[0]`` like :class:`sqlite3.Row`
+* every top-level transaction takes a global advisory lock, so writers are serialised exactly like
+  SQLite's ``BEGIN IMMEDIATE`` (no lost updates between users, payments cannot be allocated twice)
 * inside a transaction each write runs in a savepoint, so a rejected statement (duplicate ...) does not abort
   the whole transaction - the behaviour the repositories rely on
 """
@@ -19,7 +19,7 @@ from typing import Any
 
 from supplier_app.errors import DatabaseError
 
-from .errors import psycopg
+from .errors import PG_AVAILABLE, psycopg
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ _WRITE_RE = re.compile(r"^\s*(?:INSERT|UPDATE|DELETE)\b", re.I)
 
 
 class Row(tuple):
-    """Result row: index and column-name access ."""
+    """Result row: index and column-name access (like ``sqlite3.Row``)."""
 
     def __new__(cls, index: dict[str, int], values: Iterable[Any]) -> Row:
         obj = super().__new__(cls, values)
@@ -59,7 +59,7 @@ def _row_factory(cursor: Any):
 
 
 def translate_sql(sql: str) -> str:
-    """``?`` -> ``%s`` (outside string literals), literal ``%`` doubled, ``LIKE`` -> ``ILIKE``  (case-insensitive search)."""
+    """``?`` -> ``%s`` (outside string literals), literal ``%`` doubled, ``LIKE`` -> ``ILIKE`` (SQLite's LIKE ignores case)."""
     out: list[str] = []
     quote = ""
     for ch in sql:
@@ -87,7 +87,7 @@ def _clean_params(params: Params) -> Params:
 
 
 class _IntegralNumeric:
-    """SUM() over BIGINT is NUMERIC in PostgreSQL: hand integers to the code ."""
+    """SUM() over BIGINT is NUMERIC in PostgreSQL: hand integers to the code like SQLite does."""
 
     @staticmethod
     def register(conn: Any) -> None:
@@ -104,7 +104,11 @@ class _IntegralNumeric:
 class PgDatabase:
     """Thin wrapper around a psycopg 3 connection (autocommit, explicit transactions)."""
 
+    backend = "postgres"
+
     def __init__(self, dsn: str, *, timeout: float = 10.0, lock_timeout: float = 30.0) -> None:
+        if not PG_AVAILABLE:
+            raise DatabaseError("Der PostgreSQL-Treiber (psycopg) ist nicht installiert.")
         self.dsn = dsn
         self._timeout = timeout
         self._lock_timeout = lock_timeout
@@ -177,7 +181,7 @@ class PgDatabase:
         conn = self.conn
         try:
             if self._depth and _WRITE_RE.match(sql):
-                # statement-level rollback: a rejected insert must not abort the transaction
+                # statement-level rollback like SQLite: a rejected insert must not abort the transaction
                 conn.execute("SAVEPOINT stmt")
                 try:
                     cur = conn.execute(text, args)

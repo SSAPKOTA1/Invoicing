@@ -1,14 +1,15 @@
-"""PostgreSQL implementation of :class:`PartyRepository`."""
+"""SQLite implementation of :class:`PartyRepository`."""
 
 from __future__ import annotations
 
+import sqlite3
+
 from supplier_app.database.errors import INTEGRITY_ERRORS
-from supplier_app.database.pg import Row
 from supplier_app.errors import DuplicateError, NotFoundError
 from supplier_app.models.entities import Party
 from supplier_app.models.enums import PartyRole
 from supplier_app.repositories.interfaces import PartyRepository
-from supplier_app.repositories.pg_base import PgRepo, like_escape, stamp
+from supplier_app.repositories.sqlite_base import SqliteRepo, like_escape, stamp
 from supplier_app.util.normalize import normalize_iban, normalize_name
 
 _COLS = (
@@ -17,8 +18,8 @@ _COLS = (
 )
 
 
-class PgPartyRepository(PgRepo, PartyRepository):
-    def _hydrate(self, row: Row) -> Party:
+class SqlitePartyRepository(SqliteRepo, PartyRepository):
+    def _hydrate(self, row: sqlite3.Row) -> Party:
         pid = row["id"]
         aliases = [r[0] for r in self.db.query_all("SELECT alias FROM party_aliases WHERE party_id=? ORDER BY alias", (pid,))]
         ibans = [r[0] for r in self.db.query_all("SELECT iban FROM party_ibans WHERE party_id=? ORDER BY iban", (pid,))]

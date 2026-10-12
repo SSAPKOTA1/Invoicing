@@ -1,4 +1,4 @@
-"""PostgreSQL repositories for settings, interest rates, categories and the audit log."""
+"""SQLite repositories for settings, interest rates, categories and the audit log."""
 
 from __future__ import annotations
 
@@ -14,10 +14,10 @@ from supplier_app.repositories.interfaces import (
     RateRepository,
     SettingsRepository,
 )
-from supplier_app.repositories.pg_base import PgRepo, d2s, must_date, stamp
+from supplier_app.repositories.sqlite_base import SqliteRepo, d2s, must_date, stamp
 
 
-class PgSettingsRepository(PgRepo, SettingsRepository):
+class SqliteSettingsRepository(SqliteRepo, SettingsRepository):
     def get(self, key: str, default: str | None = None) -> str | None:
         row = self.db.query_one("SELECT value FROM settings WHERE key=?", (key,))
         return row[0] if row else default
@@ -35,7 +35,7 @@ class PgSettingsRepository(PgRepo, SettingsRepository):
         return {r[0]: r[1] for r in self.db.query_all("SELECT key, value FROM settings")}
 
 
-class PgRateRepository(PgRepo, RateRepository):
+class SqliteRateRepository(SqliteRepo, RateRepository):
     def list(self) -> list[InterestRate]:
         return [
             InterestRate(id=r["id"], valid_from=must_date(r["valid_from"]), base_rate=Decimal(r["base_rate"]))
@@ -53,7 +53,7 @@ class PgRateRepository(PgRepo, RateRepository):
         self.db.execute("DELETE FROM interest_rates WHERE valid_from=?", (d2s(valid_from),))
 
 
-class PgCategoryRepository(PgRepo, CategoryRepository):
+class SqliteCategoryRepository(SqliteRepo, CategoryRepository):
     def list(self) -> list[Category]:
         return [Category(id=r["id"], name=r["name"]) for r in self.db.query_all("SELECT * FROM categories ORDER BY name")]
 
@@ -67,7 +67,7 @@ class PgCategoryRepository(PgRepo, CategoryRepository):
         self.db.execute("DELETE FROM categories WHERE id=?", (category_id,))
 
 
-class PgAuditRepository(PgRepo, AuditRepository):
+class SqliteAuditRepository(SqliteRepo, AuditRepository):
     def add(self, entry: AuditLogEntry) -> AuditLogEntry:
         entry.created_at = stamp(entry.created_at)
         entry.id = self.db.insert(

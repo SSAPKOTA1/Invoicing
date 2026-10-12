@@ -54,10 +54,8 @@ class DemoDataService:
 
     def load(self, today: date | None = None) -> DemoSummary:
         svc = self.svc
-        from supplier_app.backup.dump import is_empty
-
-        if not is_empty(svc.repos.db):  # sample data must never end up in real company data (the ledger cannot be edited)
-            raise ValidationError("Beispieldaten können nur in eine leere Datenbank geladen werden.")
+        if svc.session.multi_user:
+            raise ValidationError("Beispieldaten sind im Mehrbenutzer-Betrieb nicht verfügbar (gemeinsame Firmendaten).")
         t = today or date.today()
 
         def ago(n: int) -> date:

@@ -26,7 +26,7 @@ def _qapp():
 
 @pytest.fixture()
 def server_ctx(pg_dsn, tmp_path):
-    cfg = ConnectionConfig(dsn_override=pg_dsn)
+    cfg = ConnectionConfig(mode="server", dsn_override=pg_dsn)
     ctx = build_context(AppPaths(tmp_path / "pc1"), cfg)
     yield ctx
     ctx.close()
@@ -46,7 +46,7 @@ def test_context_in_server_mode_and_first_administrator(server_ctx, monkeypatch)
     from supplier_app.views.dialogs.login_dialog import FirstAdminDialog, LoginDialog
 
     ctx = server_ctx
-    assert ctx.services.session.multi_user
+    assert ctx.multi_user and ctx.storage.db.backend == "postgres" and ctx.services.documents.files_in_database
     users = ctx.services.users
     assert users.needs_first_admin()
     dlg = FirstAdminDialog(users)
@@ -90,13 +90,13 @@ def test_window_users_card_roles_and_read_only(server_ctx) -> None:
     app, ctrl, window = make_window(ctx)
     window.show()
     try:
-        assert not window.btn_user.isHidden()
+        assert ctrl.multi_user and ctrl.lock_available and not window.btn_user.isHidden()
         assert "Die Chefin" in window.btn_user.text() and "Administrator" in window.btn_user.text()
         window.show_page("settings")
         sp = window.pages["settings"]
-        assert sp.users_card.isVisible() and sp.account_card.isVisible() and sp.security_card.isVisible()
-        assert sp.user_table.row_count() == 2
-        assert "PostgreSQL" in sp.db_info.text() and sp.btn_conn.isEnabled() is False  # DSN comes from the environment
+        assert sp.users_card.isVisible() and sp.account_card.isVisible() and not sp.security_card.isVisible()
+        assert not sp.demo_card.isVisible() and sp.user_table.row_count() == 2
+        assert "Mehrbenutzer" in sp.db_info.text() and sp.btn_conn.isEnabled() is False  # DSN comes from the environment
         # administrator creates a colleague through the dialog
         dlg = UserDialog(users)
         dlg.username.setText("anna")
@@ -141,7 +141,7 @@ def test_window_users_card_roles_and_read_only(server_ctx) -> None:
 
 
 def test_live_refresh_when_a_colleague_changes_data(server_ctx, pg_dsn, tmp_path) -> None:
-    from supplier_app.bootstrap import open_storage
+    from supplier_app.bootstrap import open_pg_storage
     from supplier_app.services.container import build_services
 
     ctx = server_ctx
@@ -155,7 +155,7 @@ def test_live_refresh_when_a_colleague_changes_data(server_ctx, pg_dsn, tmp_path
         dash = window.pages["dashboard"]
         assert dash.data.empty
         assert ctrl.poll_changes() is False  # nothing happened yet
-        other = open_storage(AppPaths(tmp_path / "pc2").ensure(), pg_dsn)
+        other = open_pg_storage(AppPaths(tmp_path / "pc2").ensure(), pg_dsn)
         try:
             colleague = build_services(other, multi_user=True)
             colleague.users.create_user("ben", "passwort2", UserRole.EDITOR)
@@ -183,10 +183,12 @@ def test_connection_dialog_and_start_flow(pg_dsn, tmp_path, monkeypatch) -> None
     from supplier_app.views.dialogs.connection_dialog import ConnectionDialog
 
     parts = psycopg.conninfo.conninfo_to_dict(pg_dsn)
-    cfg = ConnectionConfig(host=parts["host"], port=int(parts["port"]), user=parts.get("user", ""),
+    cfg = ConnectionConfig(mode="server", host=parts["host"], port=int(parts["port"]), user=parts.get("user", ""),
                            dbname=parts["dbname"])
     dlg = ConnectionDialog(ConnectionConfig())
-    assert dlg.host.isEnabled() and dlg.dbname.text() == "supplierapp"
+    assert dlg.local.isChecked() and not dlg.host.isEnabled()
+    dlg.server.setChecked(True)
+    assert dlg.host.isEnabled()
     dlg.host.setText(cfg.host)
     dlg.port.setValue(cfg.port)
     dlg.dbname.setText(cfg.dbname)
@@ -203,12 +205,11 @@ def test_connection_dialog_and_start_flow(pg_dsn, tmp_path, monkeypatch) -> None
     dlg.host.setText(cfg.host)
     dlg.port.setValue(cfg.port)
     dlg.accept()
-    assert dlg.result_config is not None and dlg.result_config.is_configured
+    assert dlg.result_config is not None and dlg.result_config.is_server
 
     # start flow: unreachable server -> connection dialog; cancelling ends the start
-    monkeypatch.delenv("SUPPLIERAPP_PG_DSN", raising=False)  # CI sets it for the program itself
     paths = AppPaths(tmp_path / "pc").ensure()
-    ConnectionConfig(host="127.0.0.1", port=1, user="x", dbname="y").save(paths.root)
+    ConnectionConfig(mode="server", host="127.0.0.1", port=1, user="x", dbname="y").save(paths.root)
     seen = []
 
     def fake_exec(self) -> int:
@@ -220,12 +221,12 @@ def test_connection_dialog_and_start_flow(pg_dsn, tmp_path, monkeypatch) -> None
     assert seen and "Verbindung" in seen[0]
     # saved settings are used again; the password is stored only on request
     loaded = ConnectionConfig.load(paths.root)
-    assert loaded.is_configured and loaded.port == 1
+    assert loaded.is_server and loaded.port == 1
     loaded.password = "geheim"
     loaded.save(paths.root, keep_password=False)
     assert ConnectionConfig.load(paths.root).password == ""
     # a valid server opens, the user is asked to sign in (first administrator)
-    good = ConnectionConfig(dsn_override=pg_dsn)
+    good = ConnectionConfig(mode="server", dsn_override=pg_dsn)
     ctx = build_context(paths, good)
     try:
         assert app_module.sign_in.__name__ == "sign_in" and ctx.services.users.needs_first_admin()

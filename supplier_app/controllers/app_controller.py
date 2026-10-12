@@ -51,13 +51,30 @@ class AppController(QObject):
         self._idle.timeout.connect(self._idle_timeout)
         app.installEventFilter(self)
         self._last_version: int | None = None
+        self._polls = 0
         self._poll = QTimer(self)
         self._poll.timeout.connect(self.poll_changes)
 
+    @property
+    def multi_user(self) -> bool:
+        return self.ctx.multi_user
+
+    @property
+    def lock_available(self) -> bool:
+        """Lock screen: PIN in single-user mode, the own password in the multi-user mode."""
+        return self.multi_user or self.ctx.services.pin.enabled
+
     def start_polling(self, interval_ms: int = 3000) -> None:
-        """Look every few seconds whether a colleague changed data and refresh then."""
-        self._last_version = self._read_version()
-        self._poll.start(interval_ms)
+        """Multi-user mode: look every few seconds whether a colleague changed data and refresh then."""
+        if self.multi_user:
+            self._last_version = self._read_version()
+            self._poll.start(interval_ms)
+            self.register_session()
+
+    def register_session(self) -> None:
+        """Shared folder mode: tell the colleagues who is connected (heartbeat file in the shared folder)."""
+        if self.ctx.registry is not None:
+            self.ctx.registry.register(self.ctx.services.session.username)
 
     def _read_version(self) -> int | None:
         try:
@@ -68,6 +85,9 @@ class AppController(QObject):
 
     def poll_changes(self) -> bool:
         """Refresh all screens when someone else changed the data. Returns True when a refresh happened."""
+        self._polls += 1
+        if self.ctx.registry is not None and self._polls % 10 == 0:
+            self.ctx.registry.heartbeat()
         version = self._read_version()
         if version is None or version == self._last_version:
             return False
@@ -86,6 +106,8 @@ class AppController(QObject):
         """Detach from the application (tests and clean exit)."""
         self._idle.stop()
         self._poll.stop()
+        if self.ctx.registry is not None:
+            self.ctx.registry.unregister()
         self.app.removeEventFilter(self)
 
     # -- theme -----------------------------------------------------------------------------
@@ -127,7 +149,8 @@ class AppController(QObject):
     # -- data -----------------------------------------------------------------------------------
     def notify_changed(self) -> None:
         """Call after any booking: all visible numbers are re-read from the ledger."""
-        self._last_version = self._read_version()  # our own change is not a reason for a second refresh
+        if self.multi_user:
+            self._last_version = self._read_version()  # our own change is not a reason for a second refresh
         self.data_changed.emit()
 
     def run(self, action: Callable[..., Any], *args: Any, parent: Any = None, success: str = "", notify: bool = True) -> Any:
@@ -147,7 +170,7 @@ class AppController(QObject):
     # -- idle lock -----------------------------------------------------------------------------------
     def restart_idle_timer(self) -> None:
         minutes = self.ctx.services.settings.get_int("idle_lock_minutes")
-        if minutes > 0:
+        if self.lock_available and minutes > 0:
             self._idle.start(minutes * 60_000)
         else:
             self._idle.stop()
@@ -158,4 +181,5 @@ class AppController(QObject):
         return False
 
     def _idle_timeout(self) -> None:
-        self.lock_requested.emit()
+        if self.lock_available:
+            self.lock_requested.emit()

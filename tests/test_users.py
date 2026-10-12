@@ -1,4 +1,4 @@
-"""Users, roles, login, lockout and read-only enforcement."""
+"""Users, roles, login, lockout and read-only enforcement (SQLite and PostgreSQL)."""
 
 from __future__ import annotations
 
@@ -136,6 +136,8 @@ def test_personal_settings_stay_on_this_machine(svc, tmp_path) -> None:
 
 def test_change_counter_moves_when_data_changes(svc) -> None:
     db = svc.repos.db
+    if db.backend != "postgres":
+        pytest.skip("SQLite reports changes of other connections only (PRAGMA data_version)")
     before = db.data_version()
     make_scenario(svc)
     assert db.data_version() != before
@@ -145,15 +147,19 @@ def test_change_counter_moves_when_data_changes(svc) -> None:
     assert db.data_changed_by() == "chef"
 
 
-def test_server_documents_backup_restore(storage, tmp_path) -> None:
-    """Files live in the database; table backups restore the server."""
+def test_server_documents_backup_restore_and_transfer(storage, tmp_path) -> None:
+    """Files live in the database; table backups restore a server; a local database can be moved to a server."""
     import zipfile
 
+    from supplier_app.backup.dump import copy_database, is_empty
     from supplier_app.backup.service import BackupService
+    from supplier_app.bootstrap import open_memory_storage
     from supplier_app.errors import BackupError
     from supplier_app.services.container import build_services
     from supplier_app.settings.local_prefs import LocalPrefs
 
+    if storage.db.backend != "postgres":
+        pytest.skip("server mode only")
     svc = build_services(storage, multi_user=True, prefs=LocalPrefs(tmp_path / "prefs.json"))
     sc = make_scenario(svc)
     src = tmp_path / "rechnung.txt"
@@ -191,32 +197,23 @@ def test_server_documents_backup_restore(storage, tmp_path) -> None:
     with pytest.raises(BackupError):
         BackupService.verify_backup(bad)  # row count no longer matches
 
-
-def test_import_of_the_old_single_user_database(storage, tmp_path) -> None:
-    """The one-time import of a supplier.db of the previous (SQLite) program version."""
-    from supplier_app.backup.legacy import import_legacy_database
-    from supplier_app.errors import BackupError
-    from supplier_app.services.container import build_services
-    from supplier_app.settings.local_prefs import LocalPrefs
-    from tests.conftest import FIXTURES
-
-    legacy = FIXTURES / "legacy"
-    garbage = tmp_path / "garbage.db"
-    garbage.write_bytes(b"not a database")
+    # transfer a local database into an empty server database
+    local = open_memory_storage()
+    lsvc = build_services(local)
+    lsc = make_scenario(lsvc)
+    lsvc.payments.record_payment(lsc.supplier.id, date(2024, 2, 1), 40000, [lsc.invoice.id])
+    lsvc.pin.set_pin("1234")
+    lsvc.settings.set_theme("light")
+    assert not is_empty(local.db)
     with pytest.raises(BackupError):
-        import_legacy_database(garbage, storage.db)
-    rows = import_legacy_database(legacy / "supplier.db", storage.db, legacy / "documents")
+        copy_database(local.db, storage.db)  # server already has data
+    from supplier_app.backup.dump import clear_database
+
+    clear_database(storage.db)
+    rows = copy_database(local.db, storage.db)
     assert rows > 10
-    svc = build_services(storage, multi_user=True, prefs=LocalPrefs(tmp_path / "prefs.json"))
-    invoice = next(i for i in svc.invoices.list() if i.invoice_number == "RE-2024/001")
-    assert svc.ledger.invoice_balance(invoice.id).balance_cents == 60000
-    assert svc.organization.companies() and svc.organization.hotels()  # the old hotel/company assignment survives
-    assert svc.settings.theme == "dark"  # personal settings and the old PIN are not copied
-    assert svc.repos.settings.get("pin_hash") is None
-    docs = [d for d in svc.documents.list() if d.original_name.endswith("beleg.txt")]
-    if docs:
-        assert svc.documents.file_path(docs[0]).exists()
-    # a new booking continues behind the imported ids
-    assert svc.invoices.create_invoice(invoice.supplier_id, "NEU", date(2024, 3, 1), gross_cents=500).id > invoice.id
-    with pytest.raises(BackupError):  # the target now holds data
-        import_legacy_database(legacy / "supplier.db", storage.db, legacy / "documents")
+    moved = build_services(storage, multi_user=True, prefs=LocalPrefs(tmp_path / "prefs2.json"))
+    assert moved.ledger.invoice_balance(lsc.invoice.id).balance_cents == lsvc.ledger.invoice_balance(lsc.invoice.id).balance_cents
+    assert not moved.pin.enabled and moved.settings.theme == "dark"  # personal settings and the PIN stay behind
+    assert moved.invoices.create_invoice(lsc.supplier.id, "NEU", date(2024, 3, 1), gross_cents=500).id > lsc.invoice.id
+    local.close()

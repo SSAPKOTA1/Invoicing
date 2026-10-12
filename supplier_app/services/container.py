@@ -16,6 +16,7 @@ from supplier_app.services.invoice_service import InvoiceService
 from supplier_app.services.ledger_service import LedgerService
 from supplier_app.services.organization_service import OrganizationService
 from supplier_app.services.payment_service import PaymentService
+from supplier_app.services.pin_service import PinService
 from supplier_app.services.search_service import SearchService
 from supplier_app.services.session import Session
 from supplier_app.services.settings_service import SettingsService
@@ -28,6 +29,7 @@ from supplier_app.settings.local_prefs import LocalPrefs
 class Services:
     repos: Repositories
     settings: SettingsService
+    pin: PinService
     suppliers: SupplierService
     ledger: LedgerService
     cases: CaseService
@@ -44,7 +46,8 @@ class Services:
     session: Session
 
 
-def build_services(storage: Storage, *, multi_user: bool = False, prefs: LocalPrefs | None = None) -> Services:
+def build_services(storage: Storage, *, multi_user: bool = False, prefs: LocalPrefs | None = None,
+                   files_in_database: bool | None = None) -> Services:
     repos = storage.repos
     settings = SettingsService(repos, prefs if multi_user else None)
     settings.ensure_defaults()
@@ -55,12 +58,15 @@ def build_services(storage: Storage, *, multi_user: bool = False, prefs: LocalPr
     invoices = InvoiceService(repos, ledger, cases, settings)
     payments = PaymentService(repos, ledger, cases, settings)
     dunning = DunningService(repos, ledger, cases, settings)
-    documents = DocumentService(repos, storage.paths)
+    if files_in_database is None:
+        files_in_database = multi_user and storage.db.backend == "postgres"  # shared folder mode keeps the files in the folder
+    documents = DocumentService(repos, storage.paths, files_in_database=files_in_database)
     ingest = IngestService(repos, documents, make_text_extractor(settings), settings, ledger, suppliers, invoices,
                            payments, dunning)
     return Services(
         repos=repos,
         settings=settings,
+        pin=PinService(repos),
         suppliers=suppliers,
         ledger=ledger,
         cases=cases,

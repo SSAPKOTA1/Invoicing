@@ -9,7 +9,7 @@ from supplier_app.errors import ValidationError
 from supplier_app.i18n import tr
 from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import Repositories
-from supplier_app.repositories.pg_documents import search_words
+from supplier_app.repositories.sqlite_documents import fts_query_from_text
 from supplier_app.services.base import ServiceBase
 from supplier_app.util.money import format_cents, parse_amount
 from supplier_app.util.normalize import normalize_iban, normalize_name, normalize_reference
@@ -117,9 +117,9 @@ class SearchService(ServiceBase):
                 invoice_reasons.setdefault(inv.id, why)
 
         # full text in documents
-        words = search_words(q)
-        if words:
-            for doc_id, snippet in self.repos.documents.fulltext(words, limit):
+        fts = fts_query_from_text(q)
+        if fts:
+            for doc_id, snippet in self.repos.documents.fulltext(fts, limit):
                 doc = self.repos.documents.get(doc_id)
                 if doc and doc_id not in doc_hits:
                     doc_hits[doc_id] = SearchHit("document", doc_id, doc.original_name,

@@ -1,17 +1,17 @@
-"""Shared helpers for the PostgreSQL repositories."""
+"""Shared helpers for the SQLite repositories."""
 
 from __future__ import annotations
 
 from datetime import date
 
-from supplier_app.database.pg import PgDatabase
+from supplier_app.database.connection import Database
 from supplier_app.util.dates import from_iso, now_iso, to_iso
 
 
-class PgRepo:
+class SqliteRepo:
     """Base class holding the database handle."""
 
-    def __init__(self, db: PgDatabase) -> None:
+    def __init__(self, db: Database) -> None:
         self.db = db
 
 

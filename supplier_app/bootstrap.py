@@ -1,32 +1,68 @@
-"""Opens the PostgreSQL database, applies migrations and builds the repository bundle."""
+"""Opens the database, applies migrations and builds the repository bundle."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from supplier_app.database.migrator import migrate
+from supplier_app.database.connection import Database
+from supplier_app.database.migrator import migrate, migrate_postgres
 from supplier_app.database.pg import PgDatabase
-from supplier_app.repositories.pg_repos import PgRepositories
+from supplier_app.errors import DatabaseError
+from supplier_app.repositories.sqlite_repos import SqliteRepositories
 from supplier_app.settings.paths import AppPaths
 
 
 @dataclass
 class Storage:
     paths: AppPaths
-    db: PgDatabase
-    repos: PgRepositories
+    db: Database | PgDatabase
+    repos: SqliteRepositories
 
     def close(self) -> None:
         self.db.close()
 
 
-def open_storage(paths: AppPaths, dsn: str) -> Storage:
-    """Connect to the server and bring the schema up to date (several PCs starting at once are safe)."""
+def open_storage(paths: AppPaths, *, shared: bool = False) -> Storage:
+    """Create folders, migrate (with backup) and open the database (``shared``: used by several PCs from a shared folder)."""
+    paths.ensure()
+    migrate(paths.database, backup_dir=paths.backups / "migrations")
+    db = Database(paths.database, shared=shared).connect()
+    if shared and db.scalar("PRAGMA quick_check") != "ok":
+        db.close()
+        raise DatabaseError(
+            "Die gemeinsame Datenbank ist beschädigt.",
+            hint=f"Bitte alle Benutzer abmelden und aus dem Ordner '{paths.backups / 'auto'}' die letzte Tagessicherung zurückholen.")
+    return Storage(paths=paths, db=db, repos=SqliteRepositories(db))
+
+
+def open_pg_storage(paths: AppPaths, dsn: str) -> Storage:
+    """Connect to the PostgreSQL server (multi-user mode) and bring the schema up to date."""
     paths.ensure()
     db = PgDatabase(dsn).connect()
     try:
-        migrate(db)
+        migrate_postgres(db)
     except Exception:
         db.close()
         raise
-    return Storage(paths=paths, db=db, repos=PgRepositories(db))
+    return Storage(paths=paths, db=db, repos=SqliteRepositories(db))  # type: ignore[arg-type]
+
+
+def open_memory_storage() -> Storage:
+    """In-memory database for tests (no files)."""
+    import tempfile
+    from pathlib import Path
+
+    from supplier_app.database.migrations import ALL_MIGRATIONS
+    from supplier_app.database.migrator import split_statements
+
+    db = Database(":memory:").connect()
+    for mig in ALL_MIGRATIONS:
+        for stmt in split_statements(mig.sql):
+            db.execute(stmt)
+    db.execute(
+        "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL)"
+    )
+    for mig in ALL_MIGRATIONS:
+        db.execute("INSERT INTO schema_version VALUES (?,?,?)", (mig.version, mig.name, "memory"))
+    tmp = Path(tempfile.mkdtemp(prefix="supplierapp-mem-"))
+    return Storage(paths=AppPaths(tmp).ensure(), db=db, repos=SqliteRepositories(db))

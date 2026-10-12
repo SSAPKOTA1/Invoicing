@@ -1,10 +1,12 @@
 # Lieferantenkonto & Mahnungs-Tracker
 
-Desktopanwendung für Windows: ein **Lieferantenkonto (offene Posten)** mit allen Rechnungen, Mahnungen
+Offline-Desktopanwendung für Windows: ein **Lieferantenkonto (offene Posten)** mit allen Rechnungen, Mahnungen
 (Zahlungserinnerung, 1./2./3. Mahnung, Inkasso, Mahnbescheid), Gebühren, Zinsen und Zahlungen – jederzeit mit
-korrektem offenem Saldo, vollständigem Verlauf und Abweichungswarnungen. Mehrere Benutzer arbeiten gleichzeitig
-mit denselben Daten. Keine Cloud, keine Registrierung: Die Daten liegen auf einem **PostgreSQL-Server in Ihrem eigenen Netz**
-(das kann auch ein normaler PC sein, der immer eingeschaltet ist – auch bei nur einem Benutzer).
+korrektem offenem Saldo, vollständigem Verlauf und Abweichungswarnungen. Keine Cloud, keine Registrierung,
+keine Zugangsdaten.
+
+> **Zwei Versionen:** Dieser Zweig (`claude/zen-cannon-x8l4cj`) enthält die **SQLite-Version** (Einzelplatz, gemeinsamer Ordner oder optional PostgreSQL-Server).
+> Die Version, die **ausschließlich PostgreSQL** verwendet, ist im Zweig [`postgresql-version`](https://github.com/SSAPKOTA1/Invoicing/tree/postgresql-version) gesichert.
 
 > **Wichtig:** Zinssätze, Pauschalen und Zuordnungsregeln sind **Voreinstellungen zur Überprüfung** und
 > **keine Rechtsberatung**. Prüfen Sie Basiszinssatz, Aufschläge (B2B 9 Prozentpunkte, B2C 5) und die Verzugspauschale
@@ -12,54 +14,36 @@ mit denselben Daten. Keine Cloud, keine Registrierung: Die Daten liegen auf eine
 
 ---
 
-## Für Anwender
-
-**Es gibt genau eine Datenbank: PostgreSQL.** Vor der ersten Nutzung braucht die Firma *einmalig* einen PostgreSQL-Server
-(siehe unten, ca. 15 Minuten). Die Anwendung selbst muss nicht installiert werden:
+## Für Anwender (nichts installieren)
 
 1. Auf GitHub unter **Actions → (letzter grüner Lauf) → Artifacts** oder unter **Releases** die Datei
    `SupplierApp-windows-x64.zip` herunterladen.
-2. ZIP-Datei **entpacken** – auf den eigenen PC (z. B. `C:\SupplierApp`) **oder in die gemeinsame Netzwerkfreigabe**
-   (z. B. `\\PCNAME\Lieferantenkonto\Programm`); dann braucht jeder PC nur eine Verknüpfung auf `SupplierApp.exe`.
-3. `SupplierApp.exe` doppelklicken. Beim ersten Start fragt die Anwendung nach dem Server (Name, Datenbank, Benutzer, Passwort);
-   danach legt der Erste den **Administrator** an. Python, Tesseract und Bibliotheken sind bereits enthalten.
+2. ZIP-Datei **entpacken** (z. B. nach `C:\SupplierApp`).
+3. `SupplierApp.exe` doppelklicken. Python, Tesseract und Bibliotheken sind bereits enthalten.
 
 **Windows SmartScreen:** Die Anwendung ist nicht signiert. Windows kann deshalb warnen
 („Der Computer wurde durch Windows geschützt“). Klicken Sie auf **„Weitere Informationen“ → „Trotzdem ausführen“**.
-
-### PostgreSQL-Server einrichten (einmalig, IT)
-
-Der Server kann auf dem PC oder NAS laufen, das auch die Freigabe mit dem Programm bereitstellt; er muss während der Arbeitszeit
-eingeschaltet sein.
-
-1. PostgreSQL 16 oder neuer installieren (kostenlos, postgresql.org; Windows-Installer, Standardwerte) und das Passwort des Administrators `postgres` merken.
-2. `scripts/setup_server.sql` öffnen, das Passwort ändern und ausführen: `psql -U postgres -f setup_server.sql` (legt Benutzer und Datenbank `supplierapp` an).
-3. Netzwerk freigeben: in `postgresql.conf` `listen_addresses = '*'` (oder die Server-Adresse), in `pg_hba.conf` eine Zeile `host supplierapp supplierapp 192.168.1.0/24 scram-sha-256` (mit Zertifikat `hostssl`; Adressbereich des Firmennetzes anpassen), Port 5432 nur im internen Netz in der Firewall öffnen. PostgreSQL-Dienst neu starten.
-
-**Auf jedem PC:** beim ersten Start (oder später *Einstellungen → Datenbank → Verbindung ändern …*) Server, Datenbank (`supplierapp`), Benutzer und Passwort eintragen, *Verbindung testen*, speichern. Die Tabellen legt die Anwendung beim ersten Start selbst an.
-
-**Programm im gemeinsamen Ordner:** Ist die Anwendung in einer Freigabe abgelegt, trägt der Administrator einmalig *Einstellungen → Datenbank → Server für alle PCs hinterlegen* ein. Das legt `connection.json` (ohne Passwort) neben `SupplierApp.exe`; jeder PC, der das Programm von dort startet, kennt den Server und fragt nur noch nach dem Datenbank-Passwort und der Anmeldung. Hinweise: Der Start vom Netzlaufwerk ist etwas langsamer; zum **Aktualisieren** muss das Programm auf allen PCs geschlossen sein (laufende Programmdateien sind gesperrt), dann den Programmordner ersetzen.
-
-**Daten der früheren Version (`supplier.db`, Einzelplatz) übernehmen:** *Einstellungen → Datenbank → Daten der früheren Version importieren …* (nur in eine leere Datenbank; die Datei bleibt unverändert; Rechnungen, Mahnungen, Zahlungen, Gesellschaften/Hotels und Dokumente werden übernommen, eine frühere PIN und persönliche Einstellungen nicht).
 
 ### Wo liegen meine Daten?
 
 | Inhalt | Ort |
 |---|---|
-| Rechnungen, Buchungen, Benutzer, **Dokumentdateien** | PostgreSQL-Datenbank auf dem Server |
-| Verbindungseinstellungen, persönliche Einstellungen (Design, gewählte Gesellschaft/Hotel), Zwischenspeicher der Dokumente, Protokolle | `%APPDATA%\SupplierApp\` auf dem jeweiligen PC (`connection.json`, `prefs.json`, `documents`, `logs`) |
+| Datenbank, Dokumente, Protokolle | `%APPDATA%\SupplierApp\` (Datenbank `supplier.db`, Ordner `documents`, `logs`) |
+| Automatische Sicherungen vor Datenbank-Updates | `%APPDATA%\SupplierApp\backups\migrations\` |
 | Manuelle Sicherungen (ZIP) | frei wählbar, Vorschlag `%APPDATA%\SupplierApp\backups\` |
+| Exporte | `%APPDATA%\SupplierApp\exports\` (Vorschlag) |
 
-Unter *Einstellungen → Pfade* öffnet ein Klick den lokalen Ordner. Das Datenbank-Passwort wird nur auf Wunsch (Option „Passwort speichern“) in `connection.json` abgelegt; Benutzerpasswörter liegen nur als Hash in der Datenbank.
+Unter *Einstellungen → Pfade* öffnet ein Klick den Datenordner.
 
 ### Schnellstart
 
-1. **Dokumente importieren** (Strg+I) bzw. Dateien per Drag & Drop in den Bereich *Dokumente* ziehen (PDF, PNG, JPG, TIFF, TXT).
-2. Die Anwendung liest den Text (PDF-Textebene, sonst OCR), erkennt Dokumentart, Absender, Datum, Beträge und alle
+1. **Einstellungen → Demo-Daten laden** zeigt alle Funktionen mit erfundenen Beispieldaten – oder
+2. **Dokumente importieren** (Strg+I) bzw. Dateien per Drag & Drop in den Bereich *Dokumente* ziehen (PDF, PNG, JPG, TIFF, TXT).
+3. Die Anwendung liest den Text (PDF-Textebene, sonst OCR), erkennt Dokumentart, Absender, Datum, Beträge und alle
    Referenznummern und **schlägt** eine Zuordnung **vor**. Unsichere Felder sind gelb markiert, ein Klick auf ein Feld zeigt die
    Fundstelle im erkannten Text.
-3. Sie prüfen/korrigieren und klicken **„Übernehmen & buchen“**. **Ohne Ihre Bestätigung wird nichts gebucht.**
-4. Die Buchungen entstehen, der offene Saldo wird neu berechnet, Abweichungen werden markiert.
+4. Sie prüfen/korrigieren und klicken **„Übernehmen & buchen“**. **Ohne Ihre Bestätigung wird nichts gebucht.**
+5. Die Buchungen entstehen, der offene Saldo wird neu berechnet, Abweichungen werden markiert.
 
 ### Wichtige Regeln der Buchhaltung
 
@@ -81,7 +65,7 @@ Unter *Einstellungen → Pfade* öffnet ein Klick den lokalen Ordner. Das Datenb
 | Strg+N | neuer Lieferant |
 | Strg+1 … Strg+7 | Bereiche der Navigation |
 | Strg+T | Hell/Dunkel umschalten |
-| Strg+L | sperren (Entsperren mit dem eigenen Passwort) |
+| Strg+L | sperren (wenn PIN aktiv) |
 | F5 | aktualisieren |
 
 ### Gesellschaften und Hotels
@@ -103,30 +87,57 @@ Netto, MwSt und Brutto werden gegeneinander geprüft (Netto + MwSt = Brutto). Fe
 
 Berichte → **Druckvorschau …** / **Drucken …**: A4 mit Kopfzeile (Titel, Filter, Gesellschaft/Hotel), wiederholter Tabellenkopf auf jeder Seite und „Seite x von y“. Breite Tabellen werden quer gedruckt (in der Vorschau/im Druckdialog änderbar). Über einen PDF-Drucker lässt sich auch eine PDF-Datei erzeugen.
 
-### Mehrere Benutzer gleichzeitig
+### Mehrbenutzer ohne Server: gemeinsamer Ordner
 
-Jeder Benutzer startet die Anwendung auf seinem eigenen PC und meldet sich mit eigenem Namen und Passwort an. Änderungen von Kollegen erscheinen nach wenigen Sekunden automatisch; gleichzeitige Buchungen werden sicher nacheinander verarbeitet (keine doppelten Zahlungen, keine doppelten Rechnungsnummern). Beim allerersten Start legen Sie den Administrator an; dieser legt unter *Einstellungen → Benutzer* die Kollegen an. Rollen: **Administrator** (alles, Benutzer, Server), **Bearbeiter** (importieren, buchen, Berichte), **Lesen** (nur ansehen und drucken; die Datenbank verweigert jede Änderung). Nach 5 falschen Passwörtern wird ein Benutzer gesperrt; der Administrator entsperrt ihn. Ein vergessenes Administrator-Passwort setzt `SupplierAppConsole.exe --set-password BENUTZER` zurück (auf einem PC mit Datenbankzugang).
+Für kleine Teams (2–5 Personen) ohne eigenen Server: Alle PCs verwenden **denselben Ordner im Netzwerk** (Freigabe eines immer eingeschalteten Windows-PCs oder NAS, z. B. `\\BUERO-PC\Lieferantenkonto`). Die Programmdateien können dort ebenfalls liegen oder auf jedem PC einzeln.
 
-* Die Anwendung sperrt sich nach einstellbarer Leerlaufzeit (*Einstellungen → Sicherheit*); zum Entsperren genügt das eigene Passwort.
+* Einrichten: auf dem PC mit den bisherigen Daten *Einstellungen → Datenbank / Mehrbenutzer → Daten in einen gemeinsamen Ordner übertragen …* (Ordner muss leer sein, lokale Daten bleiben als Kopie). Auf den anderen PCs: *Verbindung ändern → Mehrbenutzer – gemeinsamer Ordner*. Beim ersten Start den Administrator anlegen; er legt die Kollegen an (Rollen wie im Server-Betrieb).
+* Alle Benutzer arbeiten gleichzeitig; Buchungen werden nacheinander verarbeitet (nie zwei Zahlungen auf dieselbe Rechnung, nie doppelte Rechnungsnummern – auch bei gleichzeitigem Klick), Änderungen der Kollegen erscheinen nach wenigen Sekunden, in den Einstellungen sehen Sie, wer gerade verbunden ist.
+* Sicherheitsnetz: Die Datenbank wird bei jedem Start geprüft und **täglich automatisch** in `backups\auto` im gemeinsamen Ordner kopiert (die letzten 14 Tage); eine beschädigte Datenbank wird gemeldet statt benutzt. Eine Sicherung zurückspielen geht nur, wenn kein anderer Benutzer verbunden ist.
+* **Einschränkungen (bitte lesen):** SQLite ist für Netzlaufwerke nicht gebaut. Es funktioniert zuverlässig nur mit normalen **Windows-Netzwerkfreigaben (SMB)** in einem stabilen Kabel-/WLAN-Netz. **Nicht** verwenden: OneDrive/Dropbox/Google Drive-Ordner (die App lehnt sie ab), NFS, Freigaben über VPN/langsame Leitungen. Bricht die Verbindung während einer Buchung ab, kann die Datenbank im schlimmsten Fall beschädigt werden – dann die letzte Tagessicherung zurückholen. Ab etwa 5 gleichzeitigen Benutzern oder bei Zweifeln den Server-Betrieb (PostgreSQL) wählen.
+
+**Das Programm selbst im gemeinsamen Ordner ablegen:** Entpacken Sie das Paket in einen Unterordner der Freigabe, z. B. `\\PCNAME\Lieferantenkonto\Programm\SupplierApp`, und die Daten bleiben in einem anderen Unterordner (z. B. `\\PCNAME\Lieferantenkonto\Daten`). Auf jedem PC genügt dann eine Verknüpfung auf `SupplierApp.exe` in diesem Ordner. Einmalig, nachdem der Datenordner eingerichtet ist: *Einstellungen → Datenbank / Mehrbenutzer → Ordner für alle PCs hinterlegen* – das legt `connection.json` neben das Programm; jeder PC, der es von dort startet, verwendet automatisch den gemeinsamen Datenordner und fragt nur noch nach der Anmeldung (die Einstellung eines PCs selbst hat Vorrang). Hinweise: Der Start vom Netzlaufwerk ist etwas langsamer; Windows fragt beim ersten Start je PC ggf. nach („Trotzdem ausführen“); zum **Aktualisieren** muss das Programm auf allen PCs geschlossen sein (laufende Programmdateien sind gesperrt), dann den Programmordner ersetzen.
+
+### Mehrbenutzer-Betrieb mit Server (mehrere Personen gleichzeitig)
+
+Die Daten liegen dann **nicht** in einer Datei auf einem PC oder Netzlaufwerk (SQLite ist dafür nicht geeignet), sondern auf einem **PostgreSQL-Server** im Firmennetz. Jeder Benutzer startet die App auf seinem eigenen PC und meldet sich mit eigenem Namen und Passwort an. Änderungen von Kollegen erscheinen nach wenigen Sekunden automatisch; gleichzeitige Buchungen werden sicher nacheinander verarbeitet (keine doppelten Zahlungen, keine doppelten Rechnungsnummern).
+
+**Einmalig auf dem Server-PC (IT):**
+1. PostgreSQL 16 oder neuer installieren (kostenlos, postgresql.org) und das Passwort des Administrators `postgres` merken.
+2. `scripts/setup_server.sql` öffnen, das Passwort ändern und ausführen: `psql -U postgres -f setup_server.sql` (legt Benutzer und Datenbank `supplierapp` an).
+3. Netzwerk freigeben: in `postgresql.conf` `listen_addresses = '*'` (oder die Server-Adresse), in `pg_hba.conf` eine Zeile `hostssl supplierapp supplierapp 192.168.1.0/24 scram-sha-256` (Adressbereich des Firmennetzes anpassen), Port 5432 nur im internen Netz in der Firewall öffnen. Verschlüsselung (`ssl = on` mit Zertifikat) wird empfohlen.
+
+**Auf jedem PC:** Einstellungen → *Datenbank / Mehrbenutzer* → **Verbindung ändern …** → „Mehrbenutzer“ wählen, Server, Datenbank (`supplierapp`), Benutzer und Passwort eintragen, *Verbindung testen*, speichern, App neu starten. Beim allerersten Start legen Sie den Administrator an; dieser legt unter *Einstellungen → Benutzer* die Kollegen an. Rollen: **Administrator** (alles, Benutzer, Server), **Bearbeiter** (importieren, buchen, Berichte), **Lesen** (nur ansehen und drucken; die Datenbank verweigert jede Änderung).
+
+**Bestehende Daten übernehmen:** Auf dem PC mit den bisherigen Daten Einstellungen → *Daten auf einen Server übertragen …* (der Server muss leer sein; die lokalen Daten bleiben als Kopie erhalten). Belege und Dokumentdateien werden mit übertragen.
+
+**Gut zu wissen**
+* Dokumentdateien liegen in der Datenbank, jeder PC hält nur einen lokalen Zwischenspeicher.
+* Das Datenbank-Passwort wird auf dem jeweiligen PC in `connection.json` gespeichert (Option „Passwort speichern“); die Benutzerpasswörter werden nur als Hash abgelegt. Persönliche Einstellungen (Design, gewählte Gesellschaft/Hotel) bleiben auf dem eigenen PC.
+* Sicherung: *Einstellungen → Sicherung* erstellt eine ZIP-Datei mit allen Tabellen und Dokumenten (Wiederherstellen ersetzt die Server-Daten, nur Administratoren). Zusätzlich empfiehlt sich eine nächtliche Sicherung des Servers mit `pg_dump -Fc -U supplierapp supplierapp > supplierapp.dump`.
 * Alle PCs müssen dieselbe Programmversion verwenden; ein PC mit neuerer Version aktualisiert die Datenbank beim Start, ältere Versionen melden dann, dass sie aktualisiert werden müssen.
-* Die Volltextsuche findet Wortanfänge ohne Rücksicht auf Groß-/Kleinschreibung und Umlaute (ü = u).
+* Die Volltextsuche im Server-Modus findet Wortanfänge ohne Rücksicht auf Groß-/Kleinschreibung und Umlaute (ü = u), arbeitet aber auf dem Wortstamm-freien „simple“-Wörterbuch.
 * Ausgelegt für kleine Teams (bis ca. 20 gleichzeitige Benutzer); Buchungen werden aus Sicherheitsgründen serverweit nacheinander ausgeführt.
+
+### PIN-Sperre (optional)
+
+*Einstellungen → Sicherheit*: PIN mit 4–8 Ziffern (scrypt-Hash mit Salt), nach 5 Fehlversuchen steigende Wartezeit, automatische
+Sperre nach Leerlauf. Ändern/Deaktivieren verlangt die aktuelle PIN.
+**PIN vergessen?** Anwendung schließen, in der Eingabeaufforderung im Programmordner
+`SupplierAppConsole.exe --reset-pin` ausführen und die Bestätigung eingeben. Die PIN ist eine Bildschirmsperre – die Daten selbst sind
+nicht verschlüsselt.
 
 ### Sicherung und Wiederherstellung
 
-*Einstellungen → Sicherung*: erzeugt eine ZIP-Datei mit allen Tabellen und Dokumenten (mit Prüfsummen). Die Wiederherstellung (nur Administratoren) prüft die
-Datei, sichert vorher den aktuellen Stand und ersetzt dann die Daten. Zusätzlich empfiehlt sich eine nächtliche Sicherung des Servers, z. B. mit
-`pg_dump -Fc -U supplierapp supplierapp > supplierapp.dump` (Windows-Aufgabenplanung).
-
-**Daten ohne das Programm ansehen:** mit jedem PostgreSQL-Werkzeug (pgAdmin, DBeaver, `psql`) und denselben Zugangsdaten; Tabellen z. B. `invoices`, `ledger_entries`, `payments`, `parties`.
+*Einstellungen → Sicherung*: erzeugt eine ZIP-Datei mit Datenbank und allen Dokumenten (mit Prüfsummen). Die Wiederherstellung prüft die
+Datei, sichert vorher den aktuellen Stand und ersetzt dann die Daten.
 
 ### Problemlösung
 
 | Problem | Lösung |
 |---|---|
 | Keine Texterkennung bei Scans | *Einstellungen → Texterkennung → Prüfen*. Das ausgelieferte Paket enthält Tesseract (Ordner `tesseract`). Ohne ihn werden nur PDFs mit Textebene gelesen. |
-| „Der Datenbank-Server ist nicht erreichbar“ | Läuft der Server-PC? Stimmen Name/Adresse, Port 5432 (Firewall) und Passwort? Unter *Verbindung ändern …* mit *Verbindung testen* prüfen. |
-| „Die Datenbank ist gerade belegt“ | Ein Kollege bucht gerade; nach einigen Sekunden erneut versuchen. |
+| „Datenbank gesperrt“ | Zweite Instanz schließen; die Datenbank wird von nur einer Anwendung genutzt. |
 | Speicherplatz knapp | Beim Import erscheint eine Meldung; Dokumente werden nicht kopiert und nichts wird gebucht. |
 | Beschädigte PDF/Bilder | Werden mit einer Meldung abgelehnt, die Anwendung läuft weiter. |
 | Fehlerdetails | `%APPDATA%\SupplierApp\logs\supplier_app.log` |
@@ -139,10 +150,7 @@ Datei, sichert vorher den aktuellen Stand und ersetzt dann die Daten. Zusätzlic
 python -m venv .venv && . .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 python -m supplier_app                                 # GUI starten
-# alle Befehle brauchen einen PostgreSQL-Server; Verbindung z. B. per Umgebungsvariable:
-export SUPPLIERAPP_PG_DSN="host=localhost user=postgres password=... dbname=postgres"   # Programm / --selfcheck / --screenshots
-export SUPPLIER_TEST_PG_DSN="$SUPPLIERAPP_PG_DSN"                                         # Tests (legen je Test eine eigene Datenbank an)
-python -m supplier_app --selfcheck                     # Datenbank (Wegwerf-Schema), Migrationen, alle Screens offscreen (Exit-Code 0)
+python -m supplier_app --selfcheck                     # Datenbank, Migrationen, alle Screens offscreen (Exit-Code 0)
 QT_QPA_PLATFORM=offscreen python -m pytest --cov=supplier_app
 python -m supplier_app --screenshots artifacts/screenshots   # Screenshots (Demo-Daten, dunkel + hell)
 python scripts/generate_fixtures.py                    # synthetische Test-PDFs/-Scans neu erzeugen
@@ -157,7 +165,7 @@ diese Tests mit Begründung übersprungen.
 
 * `services/ledger/` – **reine** Ledger-Engine (kein DB-/Qt-Zugriff): Salden, Zahlungszuordnung, Mahnungsbuchungen, Abgleich,
   Verzugszinsen (Basiszins + Aufschlag, act/365, `Decimal` ROUND_HALF_UP), Altersstruktur. Geld = ganzzahlige Cent.
-* `database/` – PostgreSQL-Zugriff (psycopg 3): `?`-Platzhalter, Transaktionen mit Savepoint je Schreibbefehl, globale Advisory-Lock für Schreibvorgänge, Änderungszähler für die Live-Aktualisierung; nummerierte Migrationen (transaktionelles DDL, Trigger für das unveränderliche Hauptbuch, Volltextindex).
+* `database/` – SQLite-Abstraktion (Foreign Keys, WAL, FTS5), nummerierte Migrationen mit automatischer Sicherung und Rollback.
 * `ocr/` – PDF-Textebene, Tesseract (`deu+eng`, gebündelt → Einstellungen → PATH), OpenCV-Vorverarbeitung.
 * `ai/` – regelbasiert (kein LLM): `DocumentClassifier`, `FieldExtractor`, `ReferenceExtractor`, `SenderMatcher`, `LinkMatcher` hinter Interfaces.
 * `reports/` – Berichte und CSV/Excel/PDF-Export, Dashboard-Export (PNG/PDF).
@@ -168,5 +176,5 @@ Dokumentation: `docs/DECISIONS.md` (Annahmen), `docs/VERIFICATION.md` (Nachweise
 ### Paket bauen (Windows)
 
 `scripts/build_exe.ps1` baut mit PyInstaller (`packaging/SupplierApp.spec`), kopiert `tesseract.exe`, DLLs und `deu`/`eng`-Daten nach
-`dist\SupplierApp\tesseract` und erzeugt `dist\SupplierApp-windows-x64.zip`. GitHub Actions (`.github/workflows/ci.yml`; Windows-Lauf mit PostgreSQL via `scripts/ci_postgres_windows.ps1`, Linux-Lauf mit PostgreSQL-Container und Coverage-Schwellen) führt Tests,
+`dist\SupplierApp\tesseract` und erzeugt `dist\SupplierApp-windows-x64.zip`. GitHub Actions (`.github/workflows/ci.yml`) führt Tests,
 Selbstcheck, Screenshots, Build und Selbstcheck der gebauten EXE aus; `release.yml` hängt das ZIP bei Tags `vX.Y.Z` an ein Release.

@@ -1,4 +1,4 @@
-"""``python -m supplier_app [--selfcheck | --screenshots DIR | --set-password USER]`` entry point."""
+"""``python -m supplier_app [--selfcheck]`` entry point."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="supplier_app", description="Lieferantenkonto & Mahnungs-Tracker")
     parser.add_argument("--selfcheck", action="store_true", help="headless start-up check, exit code 0 when ok")
     parser.add_argument("--data-dir", help="use this data folder instead of %%APPDATA%%/SupplierApp")
+    parser.add_argument("--reset-pin", action="store_true", help="remove the PIN lock (documented recovery path)")
     parser.add_argument("--set-password", metavar="USER", help="multi-user mode: set a new password for USER (lost password)")
     parser.add_argument("--screenshots", metavar="DIR", help="render all screens (dark+light) with demo data to DIR")
     args = parser.parse_args(argv)
@@ -17,6 +18,8 @@ def main(argv: list[str] | None = None) -> int:
         import os
 
         os.environ["SUPPLIERAPP_DATA"] = args.data_dir
+    if args.reset_pin:
+        return _reset_pin()
     if args.set_password:
         return _set_password(args.set_password)
     if args.selfcheck:
@@ -32,6 +35,23 @@ def main(argv: list[str] | None = None) -> int:
     return run_gui()
 
 
+def _reset_pin() -> int:
+    """Recovery: after a typed confirmation the PIN is removed (the data itself is not encrypted)."""
+    from supplier_app.main import build_context
+
+    print("Die PIN-Sperre wird entfernt. Die Daten selbst sind nicht verschlüsselt.")
+    if input("Zur Bestätigung 'PIN ZURUECKSETZEN' eingeben: ").strip() != "PIN ZURUECKSETZEN":
+        print("Abgebrochen.")
+        return 1
+    ctx = build_context()
+    try:
+        ctx.services.pin.reset()
+    finally:
+        ctx.close()
+    print("Die PIN wurde entfernt.")
+    return 0
+
+
 def _set_password(username: str) -> int:
     """Recovery for a lost administrator password (needs the database access of this PC)."""
     import getpass
@@ -41,6 +61,9 @@ def _set_password(username: str) -> int:
 
     ctx = build_context()
     try:
+        if not ctx.multi_user:
+            print("Nur im Mehrbenutzer-Betrieb verfügbar (im Einzelplatz-Modus gibt es keine Benutzer).")
+            return 1
         user = ctx.services.users.repos.users.get_by_username(username)
         if user is None:
             print(f"Benutzer '{username}' nicht gefunden.")

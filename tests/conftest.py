@@ -10,14 +10,14 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from supplier_app.bootstrap import Storage, open_storage  # noqa: E402
+from supplier_app.bootstrap import Storage, open_memory_storage, open_storage  # noqa: E402
 from supplier_app.settings.paths import AppPaths  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-#: libpq connection string of a PostgreSQL server where the tests may create and drop databases
 PG_BASE_DSN = os.environ.get("SUPPLIER_TEST_PG_DSN", "")
+BACKENDS = ["sqlite", "postgres"] if PG_BASE_DSN else ["sqlite"]
 
 
 @pytest.fixture(scope="session")
@@ -27,7 +27,7 @@ def pg_template() -> Iterator[str]:
         pytest.skip("SUPPLIER_TEST_PG_DSN not set (no PostgreSQL test server)")
     import psycopg
 
-    from supplier_app.database.migrator import migrate
+    from supplier_app.database.migrator import migrate_postgres
     from supplier_app.database.pg import PgDatabase
 
     admin = psycopg.connect(PG_BASE_DSN, autocommit=True)
@@ -35,7 +35,7 @@ def pg_template() -> Iterator[str]:
     admin.execute("CREATE DATABASE supplier_tpl")
     tpl_dsn = psycopg.conninfo.make_conninfo(PG_BASE_DSN, dbname="supplier_tpl")
     db = PgDatabase(tpl_dsn).connect()
-    migrate(db)
+    migrate_postgres(db)
     db.close()
     yield PG_BASE_DSN
     admin.execute("DROP DATABASE IF EXISTS supplier_tpl WITH (FORCE)")
@@ -57,10 +57,15 @@ def pg_dsn(pg_template: str, request: pytest.FixtureRequest) -> Iterator[str]:
     admin.close()
 
 
-@pytest.fixture()
-def storage(pg_dsn: str, tmp_path: Path) -> Iterator[Storage]:
-    """A fresh, migrated PostgreSQL database for one test."""
-    st = open_storage(AppPaths(tmp_path / "pc").ensure(), pg_dsn)
+@pytest.fixture(params=BACKENDS)
+def storage(request: pytest.FixtureRequest, tmp_path: Path) -> Iterator[Storage]:
+    """In-memory SQLite and (when a test server is configured) PostgreSQL: the same tests run on both."""
+    if request.param == "sqlite":
+        st = open_memory_storage()
+    else:
+        from supplier_app.bootstrap import open_pg_storage
+
+        st = open_pg_storage(AppPaths(tmp_path / "pgdata").ensure(), request.getfixturevalue("pg_dsn"))
     yield st
     st.close()
 
@@ -70,12 +75,24 @@ def repos(storage: Storage):
     return storage.repos
 
 
+@pytest.fixture()
+def file_storage(tmp_path: Path) -> Iterator[Storage]:
+    st = open_storage(AppPaths(tmp_path / "data"))
+    yield st
+    st.close()
+
+
 from supplier_app.services.container import Services, build_services  # noqa: E402
 
 
 @pytest.fixture()
 def svc(storage: Storage) -> Services:
     return build_services(storage)
+
+
+@pytest.fixture()
+def file_svc(file_storage: Storage) -> Services:
+    return build_services(file_storage)
 
 
 @pytest.fixture(autouse=True)

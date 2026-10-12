@@ -1,4 +1,4 @@
-"""Repository of the application users (multi-user mode)."""
+"""Repository of the application users (multi-user mode); portable SQL for SQLite and PostgreSQL."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from supplier_app.errors import DuplicateError
 from supplier_app.models.entities import AppUser
 from supplier_app.models.enums import UserRole
 from supplier_app.repositories.interfaces import UserRepository
-from supplier_app.repositories.pg_base import PgRepo, stamp
+from supplier_app.repositories.sqlite_base import SqliteRepo, stamp
 
 
 def _user(row) -> AppUser:  # type: ignore[no-untyped-def]
@@ -18,7 +18,7 @@ def _user(row) -> AppUser:  # type: ignore[no-untyped-def]
         last_login=row["last_login"] or "")
 
 
-class PgUserRepository(PgRepo, UserRepository):
+class SqliteUserRepository(SqliteRepo, UserRepository):
     def add(self, user: AppUser) -> AppUser:
         user.created_at = stamp(user.created_at)
         try:

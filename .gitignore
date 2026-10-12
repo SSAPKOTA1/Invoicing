@@ -13,8 +13,8 @@ coverage.xml
 *.db
 *.db-wal
 *.db-shm
-
-
+*.sqlite
+*.sqlite3
 # app data folder / personal documents
 SupplierApp/
 appdata/

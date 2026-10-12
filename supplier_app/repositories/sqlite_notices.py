@@ -1,18 +1,18 @@
-"""PostgreSQL implementations of :class:`NoticeRepository` and :class:`PaymentRepository`."""
+"""SQLite implementations of :class:`NoticeRepository` and :class:`PaymentRepository`."""
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import date
 
 from supplier_app.database.errors import INTEGRITY_ERRORS
-from supplier_app.database.pg import Row
 from supplier_app.errors import DuplicateError
 from supplier_app.models.entities import DunningNotice, NoticeInvoiceClaim, Payment, PaymentAllocation
 from supplier_app.models.enums import AllocationComponent, DunningLevel, PaymentMethod
 from supplier_app.models.scope import Scope
 from supplier_app.repositories.interfaces import NoticeRepository, PaymentRepository
-from supplier_app.repositories.pg_base import PgRepo, d2s, must_date, s2d, stamp
-from supplier_app.repositories.pg_invoices import scope_clause
+from supplier_app.repositories.sqlite_base import SqliteRepo, d2s, must_date, s2d, stamp
+from supplier_app.repositories.sqlite_invoices import scope_clause
 
 _N_COLS = (
     "id, sender_party_id, supplier_id, notice_date, level, new_deadline, principal_cents, fees_cents,"
@@ -21,8 +21,8 @@ _N_COLS = (
 )
 
 
-class PgNoticeRepository(PgRepo, NoticeRepository):
-    def _hydrate(self, row: Row) -> DunningNotice:
+class SqliteNoticeRepository(SqliteRepo, NoticeRepository):
+    def _hydrate(self, row: sqlite3.Row) -> DunningNotice:
         claims = [
             NoticeInvoiceClaim(
                 id=c["id"], notice_id=c["notice_id"], invoice_id=c["invoice_id"],
@@ -104,9 +104,9 @@ class PgNoticeRepository(PgRepo, NoticeRepository):
         self.db.execute("UPDATE dunning_notices SET case_id=? WHERE id=?", (case_id, notice_id))
 
 
-class PgPaymentRepository(PgRepo, PaymentRepository):
+class SqlitePaymentRepository(SqliteRepo, PaymentRepository):
     @staticmethod
-    def _payment(row: Row) -> Payment:
+    def _payment(row: sqlite3.Row) -> Payment:
         return Payment(
             id=row["id"], supplier_id=row["supplier_id"], payment_date=must_date(row["payment_date"]),
             amount_cents=row["amount_cents"], method=PaymentMethod(row["method"]),

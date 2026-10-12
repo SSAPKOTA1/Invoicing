@@ -10,19 +10,13 @@ from pathlib import Path
 def render_screenshots(target: str) -> int:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from supplier_app.main import build_context
-    from supplier_app.selfcheck import temporary_database
     from supplier_app.selfcheck_ui import THEMES, make_window
-    from supplier_app.settings.connection import ConnectionConfig
-    from supplier_app.settings.paths import AppPaths, default_paths
+    from supplier_app.settings.paths import AppPaths
 
-    config = ConnectionConfig.load(default_paths().root)
-    if not config.is_configured:
-        print("[screenshots] kein Datenbank-Server eingerichtet (SUPPLIERAPP_PG_DSN setzen)")
-        return 1
     out = Path(target)
     out.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="supplierapp-shots-") as tmp, temporary_database(config) as temp_cfg:
-        ctx = build_context(AppPaths(Path(tmp)), temp_cfg)  # type: ignore[arg-type]
+    with tempfile.TemporaryDirectory(prefix="supplierapp-shots-") as tmp:
+        ctx = build_context(AppPaths(Path(tmp)))
         try:
             ctx.demo.load()
             app, ctrl, window = make_window(ctx)
