@@ -122,6 +122,8 @@ class ReferenceType(str, Enum):
     MANDATE_NUMBER = "mandate_number"  # Mandatsnummer
     DEBTOR_NUMBER = "debtor_number"  # Debitorennummer
     ORDER_NUMBER = "order_number"  # Bestellnummer
+    CONTRACT_NUMBER = "contract_number"  # Vertragsnummer (Miet-/Liefer-/Versicherungsvertrag)
+    LETTER_NUMBER = "letter_number"  # Schreibennummer / unser Zeichen of the sender
     PAYMENT_REFERENCE = "payment_reference"  # Zahlungsreferenz
     OTHER = "other"
 

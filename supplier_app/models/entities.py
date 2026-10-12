@@ -218,6 +218,8 @@ class Document:
     text_source: str = ""  # 'text_layer' | 'ocr' | 'plain' | ''
     company_id: int | None = None
     hotel_id: int | None = None
+    assignment_pending: bool = False  # accepted without an invoice: waits for the assignment (see IngestService)
+    pending_json: str = ""  # the confirmed proposal (JSON) that is booked when the invoice is assigned
     created_at: str = ""
 
 

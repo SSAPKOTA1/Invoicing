@@ -41,6 +41,7 @@ DEFAULTS: dict[str, str] = {
     "reference_rules": "",
     "custom_vocab": "",
     "active_scope": "",
+    "own_names": "",
 }
 
 

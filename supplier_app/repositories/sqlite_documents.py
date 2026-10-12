@@ -21,7 +21,8 @@ def _document(row: sqlite3.Row) -> Document:
         page_count=row["page_count"], doc_type=DocumentType(row["doc_type"]), ocr_text=row["ocr_text"],
         extraction_json=row["extraction_json"], review_status=ReviewStatus(row["review_status"]),
         confidence=row["confidence"], supplier_id=row["supplier_id"], text_source=row["text_source"],
-        company_id=row["company_id"], hotel_id=row["hotel_id"], created_at=row["created_at"],
+        company_id=row["company_id"], hotel_id=row["hotel_id"], assignment_pending=bool(row["assignment_pending"]),
+        pending_json=row["pending_json"], created_at=row["created_at"],
     )
 
 
@@ -54,11 +55,11 @@ class SqliteDocumentRepository(SqliteRepo, DocumentRepository):
             raise NotFoundError("Dokument ohne ID.")
         self.db.execute(
             "UPDATE documents SET stored_path=?, original_name=?, page_count=?, doc_type=?, ocr_text=?,"
-            " extraction_json=?, review_status=?, confidence=?, supplier_id=?, text_source=?, company_id=?, hotel_id=?"
-            " WHERE id=?",
+            " extraction_json=?, review_status=?, confidence=?, supplier_id=?, text_source=?, company_id=?, hotel_id=?,"
+            " assignment_pending=?, pending_json=? WHERE id=?",
             (doc.stored_path, doc.original_name, doc.page_count, doc.doc_type.value, doc.ocr_text,
              doc.extraction_json, doc.review_status.value, doc.confidence, doc.supplier_id, doc.text_source,
-             doc.company_id, doc.hotel_id, doc.id),
+             doc.company_id, doc.hotel_id, int(doc.assignment_pending), doc.pending_json, doc.id),
         )
 
     def set_scope(self, doc_id: int, company_id: int | None, hotel_id: int | None) -> None:
@@ -66,9 +67,12 @@ class SqliteDocumentRepository(SqliteRepo, DocumentRepository):
 
     def list(
         self, *, review_status: ReviewStatus | None = None, supplier_id: int | None = None, limit: int | None = None,
-        scope: Scope | None = None,
+        scope: Scope | None = None, assignment_pending: bool | None = None,
     ) -> list[Document]:
         sql, params = "SELECT * FROM documents WHERE 1=1", []
+        if assignment_pending is not None:
+            sql += " AND assignment_pending=?"
+            params.append(int(assignment_pending))
         if scope is not None and not scope.is_all:
             col, val = ("hotel_id", scope.hotel_id) if scope.hotel_id is not None else ("company_id", scope.company_id)
             sql += f" AND ({col} = ? OR company_id IS NULL)"  # documents not yet assigned stay visible

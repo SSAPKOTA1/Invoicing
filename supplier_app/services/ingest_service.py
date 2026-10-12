@@ -9,9 +9,10 @@ from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from supplier_app.ai.names import similarity
 from supplier_app.ai.pipeline import AnalysisPipeline, build_default_pipeline
 from supplier_app.ai.result_types import DocumentAnalysis, FieldValue
-from supplier_app.errors import DocumentError, ValidationError
+from supplier_app.errors import AssignmentMissingError, DocumentError, ValidationError
 from supplier_app.i18n import tx
 from supplier_app.models.entities import Document, DocumentReference, Party
 from supplier_app.models.enums import (
@@ -45,9 +46,11 @@ from supplier_app.services.review_models import (
 )
 from supplier_app.services.settings_service import SettingsService
 from supplier_app.services.supplier_service import SupplierService
-from supplier_app.util.normalize import normalize_reference, valid_iban
+from supplier_app.util.normalize import normalize_name, normalize_reference, valid_iban
 
 log = logging.getLogger(__name__)
+
+SURE_MATCH = 0.75  # above: the recognised party is shown as certain, below as a suggestion to check
 
 _KIND_BY_TYPE = {
     DocumentType.INVOICE: KIND_INVOICE, DocumentType.CREDIT_NOTE: KIND_CREDIT, DocumentType.BANK_STATEMENT: KIND_PAYMENT,
@@ -172,6 +175,13 @@ class IngestService(ServiceBase):
         if sender:
             review.supplier_id = sender.supplier_id
             review.sender_party_id = sender.party_id
+            review.sender_candidates = list(sender.candidates)
+            review.supplier_candidates = list(sender.supplier_candidates)
+            review.author_info = sender.printed
+            review.sender_suggested = sender.party_id is not None and sender.score < SURE_MATCH
+            review.supplier_suggested = sender.supplier_id is not None and (
+                sender.score < SURE_MATCH if sender.supplier_id == sender.party_id else
+                bool(sender.supplier_candidates) and sender.supplier_candidates[0].score < SURE_MATCH)
             if sender.party_id is None:
                 review.new_sender_name = sender.name
                 review.new_sender_role = (
@@ -180,6 +190,8 @@ class IngestService(ServiceBase):
                 if review.kind in (KIND_INVOICE, KIND_CREDIT):
                     review.new_supplier_name = sender.name
                     review.new_sender_name = ""
+            if review.kind == KIND_NOTICE and sender.supplier_id is None and sender.creditor_name:
+                review.new_supplier_name = sender.creditor_name
             review.confidence["sender"] = sender.score
         self._copy(review, "document_date", f.document_date)
         review.document_date = f.document_date.value if f.document_date else None
@@ -193,6 +205,7 @@ class IngestService(ServiceBase):
         review.references = [(r.ref_type, r.raw) for r in f.references]
         review.messages = [i.message for i in analysis.issues]
         top = analysis.candidates[0] if analysis.candidates else None
+        review.invoice_candidates = list(analysis.candidates)
         if f.invoice_numbers:
             review.invoice_number = str(f.invoice_numbers[0].value)
             self._copy(review, "invoice_number", f.invoice_numbers[0])
@@ -270,12 +283,35 @@ class IngestService(ServiceBase):
             review.supplier_id = analysis.candidates[0].supplier_id
 
     # -- confirmation -------------------------------------------------------------
+    @staticmethod
+    def _missing_invoice(review: ReviewData) -> str:
+        """Why the document has no invoice (empty when it needs none or has one)."""
+        if review.kind == KIND_NOTICE and not review.claims:
+            return "Dem Schreiben ist keine Rechnung zugeordnet."
+        if review.kind == KIND_CREDIT and review.invoice_id is None:
+            return "Der Gutschrift ist keine Rechnung zugeordnet."
+        if review.kind == KIND_PAYMENT and not review.payment_invoice_ids:
+            return "Der Zahlung ist keine Rechnung zugeordnet."
+        return ""
+
     @atomic
-    def confirm(self, review: ReviewData) -> ConfirmResult:
-        """Book the confirmed data in one transaction. Raises on invalid or duplicate input."""
+    def confirm(self, review: ReviewData, *, allow_unassigned: bool = False) -> ConfirmResult:
+        """Book the confirmed data in one transaction. Raises on invalid or duplicate input.
+
+        A letter, credit note or payment without an invoice raises :class:`AssignmentMissingError` first (so the screen can
+        warn); with ``allow_unassigned`` a letter / credit note is filed without booking and waits for its invoice
+        (:meth:`pending_review`), a payment is booked as credit on the supplier's account."""
         doc = self.documents.get(review.document_id)
+        if doc.review_status == ReviewStatus.ACCEPTED and not doc.assignment_pending:
+            raise ValidationError("Dieses Dokument wurde bereits übernommen.")
         result = ConfirmResult(kind=review.kind)
+        missing = self._missing_invoice(review)
+        if missing and not allow_unassigned:
+            raise AssignmentMissingError(missing)
         with self.repos.transaction():
+            if missing and review.kind in (KIND_NOTICE, KIND_CREDIT):
+                self._file_unassigned(review, doc, result)
+                return result
             if review.kind == KIND_INVOICE:
                 self._confirm_invoice(review, result)
             elif review.kind == KIND_CREDIT:
@@ -290,10 +326,64 @@ class IngestService(ServiceBase):
             doc.supplier_id = review.supplier_id
             doc.company_id, doc.hotel_id = self._document_scope(review, result)
             doc.review_status = ReviewStatus.ACCEPTED
+            doc.assignment_pending, doc.pending_json = False, ""
             self.repos.documents.update(doc)
             self._audit("confirm", "document", doc.id, review.kind)
         return result
 
+    # -- documents without invoice ------------------------------------------------------------------------------
+    def _ensure_creditor(self, review: ReviewData) -> int:
+        if review.supplier_id is not None:
+            return review.supplier_id
+        name = review.new_supplier_name.strip()
+        if not name:
+            raise ValidationError("Bitte den Lieferanten des Dokuments wählen oder einen neuen Namen angeben.")
+        if review.kind == KIND_CREDIT:  # the author of a credit note is the supplier: its printed data fit
+            party = self.suppliers.create(self._new_party_record(name, PartyRole.SUPPLIER, review))
+        else:  # a letter of a collection agency prints the agency's data, not the creditor's
+            party = self.suppliers.create(Party(name=name, role=PartyRole.SUPPLIER))
+        assert party.id is not None
+        review.supplier_id = party.id
+        return party.id
+
+    def _file_unassigned(self, review: ReviewData, doc: Document, result: ConfirmResult) -> None:
+        """Accept the document without booking: it belongs to the supplier and waits for the invoice assignment."""
+        supplier_id = self._ensure_creditor(review)
+        if review.kind == KIND_NOTICE:
+            self._ensure_sender(review, supplier_id)
+        else:
+            self._learn_master_data(supplier_id, review)
+        for ref_type, raw in review.references:
+            norm = normalize_reference(raw)
+            if norm:
+                self.repos.references.add(DocumentReference(EntityKind.DOCUMENT.value, doc.id or 0, ref_type, raw, norm))
+        doc.doc_type, doc.supplier_id = review.doc_type, supplier_id
+        doc.company_id, doc.hotel_id = self.organization.resolve(review.company_id, review.hotel_id)
+        doc.review_status = ReviewStatus.ACCEPTED
+        doc.assignment_pending, doc.pending_json = True, review.to_json()
+        self.repos.documents.update(doc)
+        self._audit("confirm_unassigned", "document", doc.id, review.kind)
+        result.unassigned = True
+        result.warnings.append(tx("Dokument ohne Rechnung abgelegt"))
+
+    def pending_review(self, doc_id: int) -> ReviewData:
+        """The proposal of a document that waits for its invoice: what the user confirmed, with fresh invoice suggestions."""
+        doc = self.documents.get(doc_id)
+        fresh = self.build_review(doc_id)
+        if not doc.assignment_pending or not doc.pending_json:
+            return fresh
+        review = ReviewData.from_json(doc.pending_json)
+        review.invoice_candidates = fresh.invoice_candidates
+        review.supplier_candidates, review.sender_candidates = fresh.supplier_candidates, fresh.sender_candidates
+        review.messages = fresh.messages
+        if not review.claims and review.kind == KIND_NOTICE and fresh.claims and review.supplier_id in (None, fresh.supplier_id):
+            review.claims = fresh.claims  # an invoice was entered since: propose it
+        if review.kind == KIND_CREDIT and review.invoice_id is None:
+            review.invoice_id = fresh.invoice_id
+        return review
+
+    def pending_documents(self) -> list[Document]:
+        return self.repos.documents.list(assignment_pending=True)
     def _document_scope(self, review: ReviewData, result: ConfirmResult) -> tuple[int | None, int | None]:
         """Scope of the document: that of the booked invoice, else the one chosen in the form."""
         if result.invoice_id is not None:
@@ -306,6 +396,37 @@ class IngestService(ServiceBase):
     def reject(self, doc_id: int) -> None:
         self.documents.set_review_status(doc_id, ReviewStatus.REJECTED)
 
+    def _is_other_party(self, printed: str, party_id: int | None) -> bool:
+        """Does the printed name clearly describe a different master-data record? (then it is no alias of this one)"""
+        for other in self.repos.parties.list():
+            if other.id != party_id and any(similarity(printed, n) >= 0.8 for n in (other.name, *other.aliases)):
+                return True
+        return False
+
+    def _free_ibans(self, ibans: list[str], party_id: int | None = None) -> list[str]:
+        """Valid IBANs that do not belong to another party yet (an IBAN identifies exactly one party)."""
+        out: list[str] = []
+        for iban in ibans:
+            if not valid_iban(iban) or iban in out:
+                continue
+            if any(p.id != party_id for p in self.repos.parties.find_by_iban(iban)):
+                continue
+            out.append(iban)
+        return out
+
+    def _new_party_record(self, name: str, role: PartyRole, review: ReviewData,
+                          represents_supplier_id: int | None = None) -> Party:
+        """A master-data record pre-filled with what the document prints about its author."""
+        info = review.author_info
+        printed = info is not None and normalize_name(info.name) == normalize_name(name)
+        ibans = self._free_ibans(list(info.ibans) if info else list(review.sender_ibans)) if (printed or info is None) else []
+        return Party(
+            name=name, role=role, ibans=ibans[:1],
+            vat_id=(info.vat_id if printed else "") or (review.sender_vat_ids[0] if review.sender_vat_ids and info is None else ""),
+            tax_number=info.tax_number if printed else "", email=info.email if printed else "",
+            phone=info.phone if printed else "", address=info.address if printed else "",
+            represents_supplier_id=represents_supplier_id)
+
     def _ensure_supplier(self, review: ReviewData) -> int:
         if review.supplier_id is not None:
             self._learn_master_data(review.supplier_id, review)
@@ -313,25 +434,32 @@ class IngestService(ServiceBase):
         name = review.new_supplier_name.strip()
         if not name:
             raise ValidationError("Bitte einen Lieferanten wählen oder einen neuen Namen angeben.")
-        ibans = [i for i in review.sender_ibans if valid_iban(i)]
-        vat = review.sender_vat_ids[0] if review.sender_vat_ids else ""
-        party = self.suppliers.create(Party(name=name, role=PartyRole.SUPPLIER, ibans=ibans[:1], vat_id=vat))
+        party = self.suppliers.create(self._new_party_record(name, PartyRole.SUPPLIER, review))
         assert party.id is not None
         review.supplier_id = party.id
         return party.id
 
-    def _learn_master_data(self, supplier_id: int, review: ReviewData) -> None:
-        """Remember the printed name as alias and new IBANs of an already known supplier."""
-        party = self.suppliers.get(supplier_id)
+    def _learn_master_data(self, party_id: int, review: ReviewData) -> None:
+        """Remember what the confirmed document tells about an already known party: printed name (alias), IBAN, tax data.
+
+        The user has confirmed that this document belongs to this party, so the printed name is a safe alias."""
+        party = self.suppliers.get(party_id)
+        info = review.author_info
         changed = False
-        printed = review.new_supplier_name.strip()
-        if printed and printed != party.name and printed not in party.aliases:
+        printed = (info.name if info else "").strip() or review.new_supplier_name.strip()
+        known = {normalize_name(n) for n in (party.name, *party.aliases)}
+        if printed and normalize_name(printed) and normalize_name(printed) not in known and not self._is_other_party(printed, party.id):
             party.aliases.append(printed)
             changed = True
-        if review.kind in (KIND_INVOICE, KIND_CREDIT):
-            for iban in review.sender_ibans:
-                if valid_iban(iban) and iban not in party.ibans:
-                    party.ibans.append(iban)
+        for iban in self._free_ibans(list(info.ibans) if info else list(review.sender_ibans), party.id):
+            if iban not in party.ibans:
+                party.ibans.append(iban)
+                changed = True
+        if info is not None:
+            for attr, value in (("vat_id", info.vat_id), ("tax_number", info.tax_number), ("email", info.email),
+                                ("phone", info.phone), ("address", info.address)):
+                if value and not getattr(party, attr):
+                    setattr(party, attr, value)
                     changed = True
         if changed:
             self.suppliers.update(party)
@@ -361,6 +489,21 @@ class IngestService(ServiceBase):
                                   f"Gutschrift {review.invoice_number}".strip(), review.document_id)
         result.invoice_id = review.invoice_id
 
+    def _ensure_sender(self, review: ReviewData, supplier_id: int) -> int:
+        """The party that wrote the letter: the chosen one (its master data is completed) or a new record."""
+        sender_id = review.sender_party_id
+        if sender_id is None:
+            name = review.new_sender_name.strip()
+            if not name:
+                raise ValidationError("Bitte den Absender wählen oder einen neuen Namen angeben.")
+            represents = supplier_id if review.new_sender_role == PartyRole.COLLECTION_AGENCY else None
+            sender = self.suppliers.create(self._new_party_record(name, review.new_sender_role, review, represents))
+            assert sender.id is not None
+            sender_id = review.sender_party_id = sender.id
+        else:
+            self._learn_master_data(sender_id, review)
+        return sender_id
+
     def _confirm_notice(self, review: ReviewData, result: ConfirmResult) -> None:
         if review.level is None or review.document_date is None or not review.claims:
             raise ValidationError("Für ein Schreiben werden Stufe, Datum und mindestens eine Rechnung benötigt.")
@@ -368,18 +511,7 @@ class IngestService(ServiceBase):
         supplier_id = review.supplier_id or (first.supplier_id if first else None)
         if supplier_id is None:
             raise ValidationError("Der Lieferant des Schreibens ist unbekannt.")
-        sender_id = review.sender_party_id
-        if sender_id is None:
-            name = review.new_sender_name.strip()
-            if not name:
-                raise ValidationError("Bitte den Absender wählen oder einen neuen Namen angeben.")
-            represents = supplier_id if review.new_sender_role == PartyRole.COLLECTION_AGENCY else None
-            ibans = [i for i in review.sender_ibans if valid_iban(i)]
-            sender = self.suppliers.create(Party(name=name, role=review.new_sender_role, ibans=ibans[:1],
-                                                 represents_supplier_id=represents))
-            assert sender.id is not None
-            sender_id = sender.id
-            review.sender_party_id = sender_id
+        sender_id = self._ensure_sender(review, supplier_id)
         draft = NoticeDraft(
             sender_party_id=sender_id, supplier_id=supplier_id, notice_date=review.document_date, level=review.level,
             claims=[NoticeClaim(c.invoice_id, c.principal_cents, c.fees_cents, c.interest_cents, c.flat_fee_cents,

@@ -104,7 +104,10 @@ class DocumentsPage(Page):
         split.addWidget(self.review)
         split.addWidget(self.tabs)
         split.setChildrenCollapsible(False)
-        split.setSizes([330, 560, 440])
+        self.review.setMinimumWidth(540)
+        left.setMinimumWidth(260)
+        split.setSizes([300, 640, 520])
+        split.setStretchFactor(1, 2)
         root.addWidget(split, 1)
 
     # -- list -----------------------------------------------------------------------------------------------

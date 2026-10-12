@@ -77,6 +77,13 @@ class AnalysisPipeline:
         return DocumentAnalysis(len(text), classification, fields, sender, candidates, issues, round(overall, 3))
 
 
+def own_names(repos: Repositories, settings: SettingsService) -> list[str]:
+    """Names of the user's own companies and hotels (and the extra names of the settings): never the sender of a letter."""
+    names = [c.name for c in repos.organization.companies()] + [h.name for h in repos.organization.hotels()]
+    names += [line.strip() for line in settings.get("own_names").splitlines() if line.strip()]
+    return names
+
+
 def build_default_pipeline(repos: Repositories, ledger: LedgerService, settings: SettingsService) -> AnalysisPipeline:
     """Rule based pipeline wired to the master data."""
     extra = ExtraVocab.from_settings(settings.custom_vocab())
@@ -86,6 +93,6 @@ def build_default_pipeline(repos: Repositories, ledger: LedgerService, settings:
     return AnalysisPipeline(
         KeywordClassifier(rules),
         RegexFieldExtractor(LabelledReferenceExtractor(settings.reference_rules()), extra),
-        RuleSenderMatcher(repos.parties),
+        RuleSenderMatcher(repos.parties, lambda: own_names(repos, settings)),
         RuleLinkMatcher(repos, ledger),
     )

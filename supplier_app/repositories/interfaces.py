@@ -180,7 +180,7 @@ class DocumentRepository(ABC):
     @abstractmethod
     def list(
         self, *, review_status: ReviewStatus | None = None, supplier_id: int | None = None, limit: int | None = None,
-        scope: Scope | None = None,
+        scope: Scope | None = None, assignment_pending: bool | None = None,
     ) -> list[Document]: ...
     @abstractmethod
     def save_file(self, doc_id: int, content: bytes) -> None:

@@ -35,6 +35,10 @@ class ValidationError(SupplierAppError):
     """Invalid user input or inconsistent data."""
 
 
+class AssignmentMissingError(ValidationError):
+    """A document has no invoice assigned. The user may still file it (and assign the invoice later) after a warning."""
+
+
 class LedgerError(SupplierAppError):
     """A ledger rule would be violated."""
 

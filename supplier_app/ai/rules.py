@@ -83,16 +83,28 @@ TITLE_BONUS = 1.5
 
 # Labels (regex alternations, case-insensitive) for references. User keywords from Settings are appended.
 REFERENCE_LABELS: dict[R, list[str]] = {
-    R.PROCESSING_NUMBER: [r"bearbeitungs\s?-?\s?(?:nummer|nr\.?|zeichen)", r"processing\s+(?:no\.?|number)"],
-    R.FILE_NUMBER: [r"aktenzeichen", r"geschäftszeichen", r"\baz\.?(?=\s*[:\s])", r"file\s+(?:no\.?|number|reference)"],
-    R.CASE_NUMBER: [r"vorgangs\s?-?\s?(?:nummer|nr\.?)", r"fallnummer", r"ticket\s?(?:nummer|nr\.?)?", r"case\s+(?:no\.?|number|id)"],
+    R.PROCESSING_NUMBER: [r"bearbeitungs\s?-?\s?(?:nummer|nr\.?|zeichen)", r"bearbeitungsnummer", r"processing\s+(?:no\.?|number)"],
+    R.FILE_NUMBER: [r"aktenzeichen", r"akten\s?-?\s?(?:nummer|nr\.?)", r"geschäftszeichen", r"geschäfts\s?-?\s?(?:nummer|nr\.?)",
+                    r"\baz\.?(?=\s*[:\s])", r"file\s+(?:no\.?|number|reference)"],
+    R.CASE_NUMBER: [r"vorgangs\s?-?\s?(?:nummer|nr\.?)", r"fallnummer", r"fall\s?-?\s?nr\.?", r"ticket\s?(?:nummer|nr\.?)?",
+                    r"case\s+(?:no\.?|number|id)"],
     R.CLAIM_NUMBER: [r"forderungs\s?-?\s?(?:nummer|nr\.?|referenz)", r"claim\s+(?:no\.?|number|ref(?:erence)?)"],
-    R.CUSTOMER_NUMBER: [r"kunden\s?-?\s?(?:nummer|nr\.?)", r"kd\.?\s?-?\s?nr\.?", r"customer\s+(?:no\.?|number|id)"],
+    R.CUSTOMER_NUMBER: [r"kunden\s?-?\s?(?:nummer|nr\.?|konto(?:\s?-?\s?nr\.?)?|id)", r"kd\.?\s?-?\s?(?:nummer|nr\.?)", r"kundenkonto",
+                        r"customer\s+(?:no\.?|number|id|account)", r"client\s+(?:no\.?|number|id)", r"account\s+(?:no\.?|number)"],
     R.MANDATE_NUMBER: [r"mandats\s?-?\s?(?:nummer|nr\.?|referenz)", r"mandate\s+(?:no\.?|number|reference)"],
-    R.DEBTOR_NUMBER: [r"debitoren\s?-?\s?(?:nummer|nr\.?)", r"schuldner\s?-?\s?(?:nummer|nr\.?)", r"debtor\s+(?:no\.?|number)"],
-    R.ORDER_NUMBER: [r"bestell\s?-?\s?(?:nummer|nr\.?)", r"auftrags\s?-?\s?(?:nummer|nr\.?)", r"order\s+(?:no\.?|number)", r"purchase\s+order"],
+    R.DEBTOR_NUMBER: [r"debitoren\s?-?\s?(?:nummer|nr\.?|konto)", r"schuldner\s?-?\s?(?:nummer|nr\.?)", r"debtor\s+(?:no\.?|number)"],
+    R.ORDER_NUMBER: [r"bestell\s?-?\s?(?:nummer|nr\.?)", r"bestellung\s*(?:nummer|nr\.?)?", r"auftrags\s?-?\s?(?:nummer|nr\.?)",
+                     r"auftrag\s*(?:nummer|nr\.?)", r"order\s+(?:no\.?|number)", r"purchase\s+order(?:\s+(?:no\.?|number))?",
+                     r"p\.?o\.?\s+(?:no\.?|number)"],
+    R.CONTRACT_NUMBER: [r"vertrags\s?-?\s?(?:nummer|nr\.?|konto(?:\s?-?\s?nr\.?)?)", r"vertrag\s*(?:nummer|nr\.?)", r"vertragskonto",
+                        r"miet(?:vertrags)?\s?-?\s?(?:nummer|nr\.?)", r"mietvertrag\s*(?:nummer|nr\.?)?", r"pacht\s?-?\s?vertrag\s*(?:nummer|nr\.?)?",
+                        r"polic(?:en|e)\s?-?\s?(?:nummer|nr\.?)", r"versicherungs\s?-?\s?(?:schein\s?-?\s?)?(?:nummer|nr\.?)",
+                        r"abo(?:nnement)?\s?-?\s?(?:nummer|nr\.?)", r"contract\s+(?:no\.?|number|id)", r"agreement\s+(?:no\.?|number)",
+                        r"schadens?\s?-?\s?(?:nummer|nr\.?)"],
+    R.LETTER_NUMBER: [r"schreibens?\s?-?\s?(?:nummer|nr\.?)", r"brief\s?-?\s?(?:nummer|nr\.?)", r"dokument(?:en)?\s?-?\s?(?:nummer|nr\.?)",
+                      r"unser\s+zeichen", r"unsere\s+referenz", r"our\s+(?:ref(?:erence)?|reference\s+no\.?)", r"letter\s+(?:no\.?|number)"],
     R.PAYMENT_REFERENCE: [r"zahlungs\s?-?\s?referenz(?:nummer)?", r"payment\s+reference"],
-    R.OTHER: [r"ihr\s+zeichen", r"unser\s+zeichen", r"ihre\s+referenz", r"unsere\s+referenz", r"your\s+reference", r"reference"],
+    R.OTHER: [r"ihr\s+zeichen", r"ihre\s+referenz", r"your\s+(?:ref(?:erence)?|reference\s+no\.?)", r"referenz(?:nummer)?", r"reference"],
 }
 
 INVOICE_NUMBER_LABELS = [

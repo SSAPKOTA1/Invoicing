@@ -44,6 +44,24 @@ def page_title(text: str) -> QLabel:
     return label
 
 
+def wrapped_label(text: str = "", name: str = "", lines: int = 2) -> QLabel:
+    """Word-wrapped label with a fixed number of reserved lines.
+
+    A normal wrapped QLabel depends on its width for its height (height-for-width); inside a scroll area that makes Qt
+    size the content smaller than its minimum, so inputs below get squeezed. This one reserves ``lines`` lines."""
+    label = QLabel(text)
+    if name:
+        label.setObjectName(name)
+    label.setWordWrap(True)
+    policy = label.sizePolicy()
+    policy.setHeightForWidth(False)
+    policy.setVerticalPolicy(QSizePolicy.Policy.Minimum)
+    label.setSizePolicy(policy)
+    label.setMinimumHeight(label.fontMetrics().lineSpacing() * lines + 6)
+    label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+    return label
+
+
 def muted(text: str = "") -> QLabel:
     label = QLabel(text)
     label.setObjectName("Muted")

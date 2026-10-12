@@ -195,7 +195,8 @@ def test_sender_matching_variants(svc) -> None:
     damaged = text("invoice_RE-2024-001").replace("Müller Bürobedarf GmbH", "Miller Burobedarf GmbH").replace(
         "DE89 3704 0044 0532 0130 00", "").replace("DE123456789", "")
     a = pl.analyze(damaged)
-    assert a.sender.party_id == sc.supplier.id and a.sender.reason in ("Briefkopf", "Name im Text")
+    assert a.sender.party_id == sc.supplier.id and ("Name" in a.sender.reason)
+    assert a.sender.candidates[0].party_id == sc.supplier.id and a.sender.candidates[0].reasons
     # unknown sender is proposed as new
     a = pl.analyze(text("invoice_en"))
     assert a.sender.party_id is None and a.sender.name.startswith("Acme") and a.sender.supplier_id is None

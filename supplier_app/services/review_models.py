@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import json
+from dataclasses import asdict, dataclass, field
 from datetime import date
 from decimal import Decimal
 
+from supplier_app.ai.result_types import LinkCandidate, NewPartyInfo, PartyCandidate
 from supplier_app.models.enums import DocumentType, DunningLevel, PartyRole, PaymentMethod, ReferenceType
 
 KIND_INVOICE = "invoice"
@@ -64,6 +66,50 @@ class ReviewData:
     messages: list[str] = field(default_factory=list)  # validation / hints shown above the form
     sender_ibans: list[str] = field(default_factory=list)
     sender_vat_ids: list[str] = field(default_factory=list)
+    supplier_candidates: list[PartyCandidate] = field(default_factory=list)  # suggestions for the supplier (ledger)
+    sender_candidates: list[PartyCandidate] = field(default_factory=list)  # suggestions for the letter's author
+    author_info: NewPartyInfo | None = None  # what the document says about its author (pre-fills a new record, is learned)
+    invoice_candidates: list[LinkCandidate] = field(default_factory=list)  # invoices the letter may concern, best first
+    supplier_suggested: bool = False  # the preselected supplier is a suggestion, not a certain match
+    sender_suggested: bool = False
+
+
+    # -- persistence of a confirmed proposal that waits for its invoice -------------------------------------------
+    _SKIP = ("supplier_candidates", "sender_candidates", "invoice_candidates", "spans", "messages", "confidence")
+
+    def to_json(self) -> str:
+        """The confirmed values as JSON (suggestions and source spans are recalculated when the document is opened)."""
+        data = asdict(self)
+        for key in self._SKIP:
+            data.pop(key, None)
+        data["kind"], data["doc_type"] = self.kind, self.doc_type.value
+        data["new_sender_role"], data["method"] = self.new_sender_role.value, self.method.value
+        data["level"] = int(self.level) if self.level is not None else None
+        data["vat_rate"] = str(self.vat_rate)
+        for name in ("document_date", "due_date"):
+            data[name] = getattr(self, name).isoformat() if getattr(self, name) else None
+        data["references"] = [[t.value, v] for t, v in self.references]
+        return json.dumps(data, ensure_ascii=False)
+
+    @classmethod
+    def from_json(cls, text: str) -> ReviewData:
+        data = json.loads(text)
+        info = data.pop("author_info", None)
+        claims = [ClaimInput(**c) for c in data.pop("claims", [])]
+        refs = [(ReferenceType(t), v) for t, v in data.pop("references", [])]
+        data["doc_type"] = DocumentType(data["doc_type"])
+        data["new_sender_role"] = PartyRole(data["new_sender_role"])
+        data["method"] = PaymentMethod(data["method"])
+        data["level"] = DunningLevel(data["level"]) if data.get("level") is not None else None
+        data["vat_rate"] = Decimal(data["vat_rate"])
+        for name in ("document_date", "due_date"):
+            data[name] = date.fromisoformat(data[name]) if data.get(name) else None
+        data["payment_invoice_ids"] = list(data.get("payment_invoice_ids", []))
+        data["sender_ibans"], data["sender_vat_ids"] = list(data.get("sender_ibans", [])), list(data.get("sender_vat_ids", []))
+        review = cls(**data)
+        review.claims, review.references = claims, refs
+        review.author_info = NewPartyInfo(**info) if info else None
+        return review
 
 
 @dataclass
@@ -74,3 +120,4 @@ class ConfirmResult:
     payment_id: int | None = None
     warnings: list[str] = field(default_factory=list)
     discrepancies: list[str] = field(default_factory=list)
+    unassigned: bool = False  # filed without an invoice: nothing was booked, the invoice is assigned later

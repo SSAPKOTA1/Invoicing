@@ -116,12 +116,44 @@ class LinkCandidate:
 
 
 @dataclass
+class PartyCandidate:
+    """One master-data party that the document may come from, with the evidence for it."""
+
+    party_id: int
+    name: str
+    score: float
+    reasons: list[str] = field(default_factory=list)
+    role: str = "supplier"
+
+    def to_json(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class NewPartyInfo:
+    """What the document tells about a sender that is not in the master data yet (to pre-fill the new record)."""
+
+    name: str = ""
+    address: str = ""
+    vat_id: str = ""
+    tax_number: str = ""
+    email: str = ""
+    phone: str = ""
+    ibans: list[str] = field(default_factory=list)
+    alternatives: list[str] = field(default_factory=list)  # other plausible printed names
+
+
+@dataclass
 class SenderMatch:
     party_id: int | None
     name: str
     score: float
     reason: str
     supplier_id: int | None = None  # supplier whose ledger it belongs to (agency -> represented supplier)
+    candidates: list[PartyCandidate] = field(default_factory=list)  # who wrote the document, best first
+    supplier_candidates: list[PartyCandidate] = field(default_factory=list)  # whose ledger it belongs to, best first
+    printed: NewPartyInfo | None = None  # what the document prints about its author (name, address, ids): pre-fills a new record
+    creditor_name: str = ""  # printed name of the creditor/mandant of a collection letter when unknown
 
 
 @dataclass

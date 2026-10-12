@@ -15,20 +15,20 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QListWidget,
     QListWidgetItem,
-    QTableWidget,
-    QVBoxLayout,
     QWidget,
 )
 
 from supplier_app.i18n import level_label, tr, tx
-from supplier_app.models.enums import DunningLevel, InvoiceStatus, PartyRole, PaymentMethod
+from supplier_app.models.enums import DunningLevel, InvoiceStatus, PaymentMethod
 from supplier_app.services.container import Services
-from supplier_app.services.review_models import ClaimInput, ReviewData
+from supplier_app.services.review_models import ReviewData
 from supplier_app.util.dates import format_date
 from supplier_app.util.money import format_cents
 from supplier_app.views.theme import repolish
+from supplier_app.views.widgets.claims_editor import ClaimsEditor
 from supplier_app.views.widgets.common import button
 from supplier_app.views.widgets.inputs import MoneyEdit, get_date, make_date_edit, set_date
+from supplier_app.views.widgets.party_picker import PartyPicker
 from supplier_app.views.widgets.scope_picker import ScopePicker
 
 
@@ -44,8 +44,9 @@ class BaseForm(QWidget):
         super().__init__()
         self.svc, self.threshold, self.on_focus = svc, threshold, on_focus
         self.form = QFormLayout(self)
+        self.form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)  # label above the field: the fields get the full width
         self.form.setHorizontalSpacing(14)
-        self.form.setVerticalSpacing(8)
+        self.form.setVerticalSpacing(6)
         self._tracked: dict[QObject, str] = {}
 
     def track(self, widget: QWidget, field: str) -> None:
@@ -61,15 +62,9 @@ class BaseForm(QWidget):
     def low(self, review: ReviewData, field: str) -> bool:
         return field in review.confidence and review.confidence[field] < self.threshold
 
-    def supplier_combo(self, allow_new: bool = True) -> tuple[QComboBox, QLineEdit]:
-        combo = QComboBox()
-        if allow_new:
-            combo.addItem(tr("review.new_supplier"), None)
-        for p in self.svc.suppliers.suppliers():
-            combo.addItem(p.name, p.id)
-        name = QLineEdit()
-        name.setPlaceholderText(tr("review.new_supplier_name"))
-        return combo, name
+    def picker(self, allow_new: bool = True, with_role: bool = False, new_label: str | None = None) -> PartyPicker:
+        """Supplier / sender chooser with the recognition's suggestions (see :class:`PartyPicker`)."""
+        return PartyPicker(self.svc.suppliers.list(), allow_new=allow_new, with_role=with_role, new_label=new_label)
 
     def load(self, review: ReviewData) -> None:
         """Fill the widgets from the proposal (overridden by every concrete form)."""
@@ -83,7 +78,7 @@ class BaseForm(QWidget):
 class InvoiceForm(BaseForm):
     def __init__(self, svc, threshold, on_focus) -> None:
         super().__init__(svc, threshold, on_focus)
-        self.supplier, self.new_name = self.supplier_combo()
+        self.supplier = self.picker()
         self.number = QLineEdit()
         self.date = make_date_edit()
         self.due = make_date_edit()
@@ -103,7 +98,6 @@ class InvoiceForm(BaseForm):
         due_holder.setLayout(due_row)
         due_row.setContentsMargins(0, 0, 0, 0)
         self.form.addRow(tr("invoice.supplier"), self.supplier)
-        self.form.addRow("", self.new_name)
         self.form.addRow(tr("org.assignment"), self.scope)
         self.form.addRow(tr("invoice.number"), self.number)
         self.form.addRow(tr("invoice.date"), self.date)
@@ -112,11 +106,10 @@ class InvoiceForm(BaseForm):
         self.form.addRow(tr("invoice.net"), self.net)
         self.form.addRow(tr("invoice.vat"), self.vat)
         self.form.addRow(tr("invoice.gross"), self.gross)
-        self.supplier.currentIndexChanged.connect(lambda _i: self.new_name.setVisible(self.supplier.currentData() is None))
         self.due.dateChanged.connect(lambda _d: mark(self.due, False))  # an edited date is no longer a guess
         for w, f in ((self.number, "invoice_number"), (self.date, "document_date"), (self.due, "due_date"),
-                     (self.net, "net_cents"), (self.vat, "vat_cents"), (self.gross, "gross_cents"), (self.supplier, "sender"),
-                     (self.new_name, "sender")):
+                     (self.net, "net_cents"), (self.vat, "vat_cents"), (self.gross, "gross_cents"), (self.supplier.combo, "sender"),
+                     (self.supplier.new_name, "sender")):
             self.track(w, f)
 
     def _due_plus(self, days: int) -> None:
@@ -127,9 +120,9 @@ class InvoiceForm(BaseForm):
         self.scope.reload()
         self.form.setRowVisible(self.scope, self.svc.organization.configured)
         self.scope.set_values(r.company_id, r.hotel_id)
-        self.supplier.setCurrentIndex(max(0, self.supplier.findData(r.supplier_id)))
-        self.new_name.setText(r.new_supplier_name)
-        self.new_name.setVisible(self.supplier.currentData() is None)
+        self.supplier.set_candidates(r.supplier_candidates, r.supplier_id, r.new_supplier_name, r.author_info,
+                                     r.supplier_suggested)
+        self.supplier.mark(self.low(r, "sender") or r.supplier_suggested)
         self.number.setText(r.invoice_number)
         set_date(self.date, r.document_date)
         set_date(self.due, r.due_date or r.document_date)
@@ -138,13 +131,12 @@ class InvoiceForm(BaseForm):
         self.vat.set_cents(r.vat_cents)
         self.gross.set_cents(r.gross_cents)
         for w, f in ((self.number, "invoice_number"), (self.date, "document_date"), (self.due, "due_date"),
-                     (self.net, "net_cents"), (self.vat, "vat_cents"), (self.gross, "gross_cents"),
-                     (self.supplier, "sender"), (self.new_name, "sender")):
+                     (self.net, "net_cents"), (self.vat, "vat_cents"), (self.gross, "gross_cents")):
             mark(w, self.low(r, f))
 
     def apply(self, r: ReviewData) -> None:
-        r.supplier_id = self.supplier.currentData()
-        r.new_supplier_name = self.new_name.text().strip()
+        r.supplier_id = self.supplier.party_id()
+        r.new_supplier_name = self.supplier.name_for_new()
         r.invoice_number = self.number.text().strip()
         r.document_date, r.due_date = get_date(self.date), get_date(self.due)
         r.company_id, r.hotel_id = self.scope.company_id, self.scope.hotel_id
@@ -155,7 +147,7 @@ class InvoiceForm(BaseForm):
 class CreditForm(BaseForm):
     def __init__(self, svc, threshold, on_focus) -> None:
         super().__init__(svc, threshold, on_focus)
-        self.supplier, _ = self.supplier_combo(allow_new=False)
+        self.supplier = self.picker(allow_new=False)
         self.invoice = QComboBox()
         self.number = QLineEdit()
         self.date = make_date_edit()
@@ -165,20 +157,21 @@ class CreditForm(BaseForm):
         self.form.addRow(tr("review.credit_number"), self.number)
         self.form.addRow(tr("common.date"), self.date)
         self.form.addRow(tr("common.amount"), self.amount)
-        self.supplier.currentIndexChanged.connect(lambda _i: self._fill_invoices(None))
+        self.supplier.changed.connect(lambda: self._fill_invoices(None))
         for w, f in ((self.number, "invoice_number"), (self.date, "document_date"), (self.amount, "gross_cents")):
             self.track(w, f)
 
     def _fill_invoices(self, select: int | None) -> None:
         self.invoice.clear()
-        sid = self.supplier.currentData()
+        sid = self.supplier.party_id()
         for inv in self.svc.invoices.list(supplier_id=sid) if sid else []:
             if inv.status != InvoiceStatus.CANCELLED:
                 self.invoice.addItem(f"{inv.invoice_number} ({format_cents(inv.gross_cents)})", inv.id)
         self.invoice.setCurrentIndex(max(0, self.invoice.findData(select)))
 
     def load(self, r: ReviewData) -> None:
-        self.supplier.setCurrentIndex(max(0, self.supplier.findData(r.supplier_id)))
+        self.supplier.set_candidates(r.supplier_candidates, r.supplier_id, "", r.author_info, r.supplier_suggested)
+        self.supplier.mark(r.supplier_suggested)
         self._fill_invoices(r.invoice_id)
         self.number.setText(r.invoice_number)
         set_date(self.date, r.document_date)
@@ -187,7 +180,7 @@ class CreditForm(BaseForm):
         mark(self.date, self.low(r, "document_date"))
 
     def apply(self, r: ReviewData) -> None:
-        r.supplier_id = self.supplier.currentData()
+        r.supplier_id = self.supplier.party_id()
         r.invoice_id = self.invoice.currentData()
         r.invoice_number = self.number.text().strip()
         r.document_date = get_date(self.date)
@@ -195,133 +188,60 @@ class CreditForm(BaseForm):
 
 
 class NoticeForm(BaseForm):
-    COLS = ("principal", "fees", "interest", "flat", "other", "total")
+    """Reminder / collection letter: author, creditor (whose ledger), dates, and the invoices it concerns."""
 
     def __init__(self, svc, threshold, on_focus) -> None:
         super().__init__(svc, threshold, on_focus)
-        self.supplier, _ = self.supplier_combo(allow_new=False)
-        self.sender = QComboBox()
-        self.sender.addItem(tr("review.new_sender"), None)
-        for p in svc.suppliers.list():
-            self.sender.addItem(f"{p.name} ({tr('role.' + p.role.value)})", p.id)
-        self.new_sender = QLineEdit()
-        self.new_sender.setPlaceholderText(tr("review.new_sender_name"))
-        self.new_role = QComboBox()
-        for role in PartyRole:
-            self.new_role.addItem(tr(f"role.{role.value}"), role)
+        self.supplier = self.picker(allow_new=True, new_label=tr("review.new_supplier"))
+        self.sender = self.picker(allow_new=True, with_role=True, new_label=tr("review.new_sender"))
+        self.sender.new_name.setPlaceholderText(tr("review.new_sender_name"))
         self.date = make_date_edit()
         self.level = QComboBox()
         for lv in DunningLevel:
             self.level.addItem(level_label(int(lv)), lv)
         self.deadline = make_date_edit()
         self.credited, self.total = MoneyEdit(), MoneyEdit()
-        self.form.addRow(tr("review.notice_supplier"), self.supplier)
+        self.claims = ClaimsEditor(svc)
         self.form.addRow(tr("notice.sender"), self.sender)
-        row = QHBoxLayout()
-        row.addWidget(self.new_sender, 1)
-        row.addWidget(self.new_role)
-        holder = QWidget()
-        holder.setLayout(row)
-        row.setContentsMargins(0, 0, 0, 0)
-        self.new_holder = holder
-        self.form.addRow("", holder)
+        self.form.addRow(tr("review.notice_supplier"), self.supplier)
         self.form.addRow(tr("common.date"), self.date)
         self.form.addRow(tr("notice.level"), self.level)
         self.form.addRow(tr("notice.deadline"), self.deadline)
-        self.claims = QTableWidget(0, 7)
-        self.claims.setHorizontalHeaderLabels([tr("invoice.number"), tr("notice.principal"), tr("notice.fees"),
-                                               tr("notice.interest"), tr("notice.flat"), tr("notice.other"), tr("notice.total")])
-        self.claims.verticalHeader().setVisible(False)
-        self.claims.setMinimumHeight(120)
-        self.claims.setMaximumHeight(180)
-        self.claims.horizontalHeader().setStretchLastSection(True)
-        self.claims.setColumnWidth(0, 170)
-        box = QVBoxLayout()
-        box.addWidget(self.claims)
-        tools = QHBoxLayout()
-        tools.addWidget(button(tr("review.add_claim"), "flat", lambda: self._add_claim(None)))
-        tools.addWidget(button(tr("review.remove_claim"), "flat", self._remove_claim))
-        tools.addStretch(1)
-        box.addLayout(tools)
-        wrap = QWidget()
-        wrap.setLayout(box)
-        box.setContentsMargins(0, 0, 0, 0)
-        self.form.addRow(tr("review.claims"), wrap)
+        self.form.addRow(tr("review.claims"), self.claims)
         self.form.addRow(tr("notice.credited"), self.credited)
         self.form.addRow(tr("notice.total_claimed"), self.total)
-        self.sender.currentIndexChanged.connect(self._sync_sender)
-        self.supplier.currentIndexChanged.connect(self._supplier_changed)
+        self.supplier.changed.connect(lambda: self.claims.set_supplier(self.supplier.party_id()))
         for w, f in ((self.date, "document_date"), (self.deadline, "due_date"), (self.total, "total_claimed_cents"),
-                     (self.new_sender, "sender"), (self.sender, "sender")):
+                     (self.sender.combo, "sender"), (self.sender.new_name, "sender")):
             self.track(w, f)
 
-    def _sync_sender(self) -> None:
-        self.new_holder.setVisible(self.sender.currentData() is None)
-
-    def _supplier_changed(self) -> None:
-        for r in range(self.claims.rowCount()):
-            combo = self.claims.cellWidget(r, 0)
-            cur = combo.currentData()
-            self._fill_invoice_combo(combo, cur)
-
-    def _fill_invoice_combo(self, combo: QComboBox, select: int | None) -> None:
-        combo.blockSignals(True)
-        combo.clear()
-        sid = self.supplier.currentData()
-        for inv in self.svc.invoices.list(supplier_id=sid) if sid else []:
-            combo.addItem(inv.invoice_number, inv.id)
-        combo.setCurrentIndex(max(0, combo.findData(select)))
-        combo.blockSignals(False)
-
-    def _add_claim(self, claim: ClaimInput | None) -> None:
-        r = self.claims.rowCount()
-        self.claims.insertRow(r)
-        combo = QComboBox()
-        self._fill_invoice_combo(combo, claim.invoice_id if claim else None)
-        self.claims.setCellWidget(r, 0, combo)
-        values = [claim.principal_cents, claim.fees_cents, claim.interest_cents, claim.flat_fee_cents,
-                  claim.other_costs_cents, claim.total_cents] if claim else [None] * 6
-        for c, v in enumerate(values, start=1):
-            edit = MoneyEdit()
-            edit.set_cents(v)
-            self.claims.setCellWidget(r, c, edit)
-
-    def _remove_claim(self) -> None:
-        r = self.claims.currentRow()
-        if r >= 0:
-            self.claims.removeRow(r)
-
     def load(self, r: ReviewData) -> None:
-        self.supplier.setCurrentIndex(max(0, self.supplier.findData(r.supplier_id)))
-        self.sender.setCurrentIndex(max(0, self.sender.findData(r.sender_party_id)))
-        self.new_sender.setText(r.new_sender_name)
-        self.new_role.setCurrentIndex(max(0, self.new_role.findData(r.new_sender_role)))
-        self._sync_sender()
+        self.sender.set_candidates(r.sender_candidates, r.sender_party_id, r.new_sender_name, r.author_info, r.sender_suggested)
+        if self.sender.new_role is not None:
+            self.sender.new_role.setCurrentIndex(max(0, self.sender.new_role.findData(r.new_sender_role)))
+        self.sender.mark(self.low(r, "sender") or r.sender_suggested)
+        self.supplier.set_candidates(r.supplier_candidates, r.supplier_id, r.new_supplier_name, None, r.supplier_suggested)
+        self.supplier.mark(r.supplier_suggested)
         set_date(self.date, r.document_date)
         if r.level:
             self.level.setCurrentIndex(max(0, self.level.findData(r.level)))
         set_date(self.deadline, r.due_date or r.document_date)
-        self.claims.setRowCount(0)
-        for c in r.claims:
-            self._add_claim(c)
+        self.claims.set_supplier(self.supplier.party_id())
+        self.claims.set_claims(r.claims, r.invoice_candidates)
         self.credited.set_cents(r.credited_cents or None)
         self.total.set_cents(r.total_claimed_cents or None)
-        for w, f in ((self.date, "document_date"), (self.deadline, "due_date"), (self.total, "total_claimed_cents"),
-                     (self.sender, "sender"), (self.new_sender, "sender")):
+        for w, f in ((self.date, "document_date"), (self.deadline, "due_date"), (self.total, "total_claimed_cents")):
             mark(w, self.low(r, f))
 
     def apply(self, r: ReviewData) -> None:
-        r.supplier_id = self.supplier.currentData()
-        r.sender_party_id = self.sender.currentData()
-        r.new_sender_name = self.new_sender.text().strip()
-        r.new_sender_role = PartyRole(self.new_role.currentData())
+        r.supplier_id = self.supplier.party_id()
+        r.new_supplier_name = self.supplier.name_for_new()
+        r.sender_party_id = self.sender.party_id()
+        r.new_sender_name = self.sender.name_for_new()
+        r.new_sender_role = self.sender.role_for_new() or r.new_sender_role
         r.document_date, r.due_date = get_date(self.date), get_date(self.deadline)
         r.level = DunningLevel(self.level.currentData())
-        claims: list[ClaimInput] = []
-        for row in range(self.claims.rowCount()):
-            vals = [int(self.claims.cellWidget(row, c).cents() or 0) for c in range(1, 7)]
-            claims.append(ClaimInput(self.claims.cellWidget(row, 0).currentData(), *vals))
-        r.claims = claims
+        r.claims = self.claims.claims()
         r.credited_cents = int(self.credited.cents() or 0)
         r.total_claimed_cents = int(self.total.cents() or 0)
 
@@ -329,7 +249,7 @@ class NoticeForm(BaseForm):
 class PaymentForm(BaseForm):
     def __init__(self, svc, threshold, on_focus) -> None:
         super().__init__(svc, threshold, on_focus)
-        self.supplier, _ = self.supplier_combo(allow_new=False)
+        self.supplier = self.picker(allow_new=False)
         self.date = make_date_edit()
         self.amount = MoneyEdit()
         self.method = QComboBox()
@@ -347,13 +267,13 @@ class PaymentForm(BaseForm):
         self.form.addRow(tr("payment.reference"), self.reference)
         self.form.addRow(tr("payment.iban"), self.iban)
         self.form.addRow(tr("payment.invoices"), self.invoices)
-        self.supplier.currentIndexChanged.connect(lambda _i: self._fill(set()))
+        self.supplier.changed.connect(lambda: self._fill(set()))
         for w, f in ((self.date, "document_date"), (self.amount, "payment_amount_cents")):
             self.track(w, f)
 
     def _fill(self, selected: set[int]) -> None:
         self.invoices.clear()
-        sid = self.supplier.currentData()
+        sid = self.supplier.party_id()
         for s in self.svc.ledger.invoice_states(supplier_id=sid) if sid else []:
             if s.balance.balance_cents > 0 and s.invoice.status != InvoiceStatus.CANCELLED:
                 it = QListWidgetItem(tx(f"{s.invoice.invoice_number} · fällig {format_date(s.invoice.due_date)} · "
@@ -367,7 +287,8 @@ class PaymentForm(BaseForm):
         self.scope.reload()
         self.form.setRowVisible(self.scope, self.svc.organization.configured)
         self.scope.set_values(r.company_id, r.hotel_id)
-        self.supplier.setCurrentIndex(max(0, self.supplier.findData(r.supplier_id)))
+        self.supplier.set_candidates(r.supplier_candidates, r.supplier_id, "", r.author_info, r.supplier_suggested)
+        self.supplier.mark(r.supplier_suggested)
         self._fill(set(r.payment_invoice_ids))
         set_date(self.date, r.document_date)
         self.amount.set_cents(r.payment_amount_cents)
@@ -377,7 +298,7 @@ class PaymentForm(BaseForm):
         mark(self.date, self.low(r, "document_date"))
 
     def apply(self, r: ReviewData) -> None:
-        r.supplier_id = self.supplier.currentData()
+        r.supplier_id = self.supplier.party_id()
         r.document_date = get_date(self.date)
         r.payment_amount_cents = self.amount.cents()
         r.company_id, r.hotel_id = self.scope.company_id, self.scope.hotel_id

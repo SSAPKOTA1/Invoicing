@@ -384,3 +384,38 @@ EN.update({
     "Rechnung {invoice_number} ist bereits erfasst.": "Invoice {invoice_number} has already been recorded.",
     "Keine passende Rechnung gefunden. Bitte manuell zuordnen.": "No matching invoice found. Please allocate manually.",
 })
+
+EN.update({
+    "IBAN": "IBAN",
+    "USt-IdNr.": "VAT ID",
+    "Steuernummer": "tax number",
+    "E-Mail-Adresse": "e-mail address",
+    "E-Mail-/Web-Domain": "e-mail / web domain",
+    "Name ({where}, {pct} %)": "name ({where}, {pct} %)",
+    "Absenderzeile": "sender line",
+    "Briefkopf": "letterhead",
+    "Fußzeile": "footer",
+    "Text": "text",
+    "Name im Text": "name in the text",
+    "mehrdeutig": "ambiguous",
+    "vom Inkassobüro vertretener Lieferant": "supplier represented by the collection agency",
+    "Zahlungsempfänger: {reasons}": "payee: {reasons}",
+    "Rechnungsnummer {invoice_number} im Dokument": "invoice number {invoice_number} in the document",
+    "Rechnungsnummer {invoice_number} (abweichende Schreibweise)": "invoice number {invoice_number} (different spelling)",
+    "bekannte Referenz {ref}": "known reference {ref}",
+    "Betrag {amount} entspricht der Rechnung": "amount {amount} matches the invoice",
+    "Rechnungsdatum stimmt überein": "invoice date matches",
+    "gleicher Lieferant": "same supplier",
+    "anderer Lieferant": "different supplier",
+    "Zahlung entspricht dem offenen Betrag": "payment equals the open amount",
+})
+
+EN.update({
+    "Dem Schreiben ist keine Rechnung zugeordnet.": "No invoice is assigned to the letter.",
+    "Der Gutschrift ist keine Rechnung zugeordnet.": "No invoice is assigned to the credit note.",
+    "Der Zahlung ist keine Rechnung zugeordnet.": "No invoice is assigned to the payment.",
+    "Dieses Dokument wurde bereits übernommen.": "This document has already been accepted.",
+    "Bitte den Lieferanten des Dokuments wählen oder einen neuen Namen angeben.": "Please choose the supplier of the document or enter a new name.",
+    "Dokument ohne Rechnung abgelegt": "Document filed without invoice",
+    "Zuordnung der Rechnung": "Invoice assigned",
+})

@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from supplier_app.controllers.app_controller import AppController
-from supplier_app.errors import SupplierAppError
+from supplier_app.errors import AssignmentMissingError, SupplierAppError
 from supplier_app.i18n import tr
 from supplier_app.models.enums import ReferenceType, ReviewStatus
 from supplier_app.services.review_models import (
@@ -27,8 +27,8 @@ from supplier_app.services.review_models import (
     KIND_PAYMENT,
     ReviewData,
 )
-from supplier_app.views.errors import show_error
-from supplier_app.views.widgets.common import button
+from supplier_app.views.errors import confirm, show_error
+from supplier_app.views.widgets.common import button, wrapped_label
 from supplier_app.views.widgets.review_forms import (
     CreditForm,
     InvoiceForm,
@@ -50,6 +50,7 @@ class ReviewPanel(QWidget):
         super().__init__()
         self.ctrl = ctrl
         self.review: ReviewData | None = None
+        self.pending = False  # the document is accepted but waits for its invoice
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         self.title = QLabel(tr("review.title"))
@@ -92,8 +93,9 @@ class ReviewPanel(QWidget):
         self.refs.verticalHeader().setVisible(False)
         self.refs.horizontalHeader().setStretchLastSection(True)
         self.refs.setColumnWidth(0, 190)
-        self.refs.setMinimumHeight(110)
-        self.refs.setMaximumHeight(150)
+        self.refs.verticalHeader().setDefaultSectionSize(40)
+        self.refs.setMinimumHeight(130)
+        self.refs.setMaximumHeight(190)
         self.inner.addWidget(self.refs)
         rb = QHBoxLayout()
         rb.addWidget(button(tr("review.add_ref"), "flat", lambda: self._add_ref(ReferenceType.OTHER, "")))
@@ -135,8 +137,10 @@ class ReviewPanel(QWidget):
             return
         svc = self.ctrl.ctx.services
         doc = svc.documents.get(doc_id)
-        decided = doc.review_status in (ReviewStatus.ACCEPTED, ReviewStatus.REJECTED)
-        self.review = svc.ingest.build_review(doc_id)
+        self.pending = doc.assignment_pending
+        decided = doc.review_status in (ReviewStatus.ACCEPTED, ReviewStatus.REJECTED) and not self.pending
+        self.review = svc.ingest.pending_review(doc_id) if self.pending else svc.ingest.build_review(doc_id)
+        self.btn_ok.setText(tr("review.assign") if self.pending else tr("review.accept"))
         r = self.review
         scope = self.ctrl.scope
         if not decided and r.company_id is None and r.hotel_id is None and not scope.is_all:
@@ -152,10 +156,10 @@ class ReviewPanel(QWidget):
         self.confidence.setText(tr("review.confidence", n=int(doc.confidence * 100)))
         self.title.setText(f"{tr('review.title')}: {doc.original_name}")
         for msg in r.messages:
-            lab = QLabel("⚠ " + msg)
-            lab.setObjectName("Warning")
-            lab.setWordWrap(True)
+            lab = wrapped_label("⚠ " + msg, "Warning", 2 if len(msg) < 90 else 3)
             self.messages.addWidget(lab)
+        if self.pending:
+            self.messages.insertWidget(0, wrapped_label("⏳ " + tr("review.pending_assignment"), "Warning", 2))
         if decided:
             note = QLabel(tr(f"review.decided.{doc.review_status.value}"))
             note.setObjectName("Muted")
@@ -217,7 +221,12 @@ class ReviewPanel(QWidget):
             return
         self.error.setVisible(False)
         try:
-            result = self.ctrl.ctx.services.ingest.confirm(r)
+            try:
+                result = self.ctrl.ctx.services.ingest.confirm(r)
+            except AssignmentMissingError as exc:  # warn, then file it without an invoice if the user wants that
+                if not confirm(self, tr("review.unassigned.title"), tr("review.unassigned.text", reason=exc.message)):
+                    return
+                result = self.ctrl.ctx.services.ingest.confirm(r, allow_unassigned=True)
         except SupplierAppError as exc:
             self.error.setText(exc.message)
             self.error.setVisible(True)
@@ -226,7 +235,7 @@ class ReviewPanel(QWidget):
             show_error(self, exc)
             return
         self.ctrl.notify_changed()
-        self.ctrl.status.emit(tr("review.booked"))
+        self.ctrl.status.emit(tr("review.filed") if result.unassigned else tr("review.booked"))
         msgs = result.discrepancies + result.warnings
         if msgs:
             from supplier_app.views.errors import info

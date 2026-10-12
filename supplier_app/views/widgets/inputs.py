@@ -22,6 +22,7 @@ class MoneyEdit(QLineEdit):
         self.allow_negative = allow_negative
         self.setPlaceholderText("0,00")
         self.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.setMinimumHeight(34)
         self.editingFinished.connect(self._normalize)
         self.textChanged.connect(lambda _t: self.changed.emit())
 
@@ -56,6 +57,7 @@ class MoneyEdit(QLineEdit):
 def make_date_edit(value: date | None = None) -> QDateEdit:
     edit = QDateEdit()
     edit.setCalendarPopup(True)
+    edit.setMinimumHeight(34)
     edit.setDisplayFormat("dd.MM.yyyy")
     set_date(edit, value or date.today())
     return edit
