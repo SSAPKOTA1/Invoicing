@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 
+from supplier_app.i18n import tx
 from supplier_app.models.enums import LedgerEntryType as T
 from supplier_app.util.dates import format_date
 from supplier_app.util.money import format_cents
@@ -80,6 +81,9 @@ class Issue:
     code: str  # DIFF | PAYMENT_IGNORED | SUM_MISMATCH
     message: str
     invoice_id: int | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "message", tx(self.message))
 
 
 @dataclass(frozen=True)

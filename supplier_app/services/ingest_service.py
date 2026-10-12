@@ -12,6 +12,7 @@ from pathlib import Path
 from supplier_app.ai.pipeline import AnalysisPipeline, build_default_pipeline
 from supplier_app.ai.result_types import DocumentAnalysis, FieldValue
 from supplier_app.errors import DocumentError, ValidationError
+from supplier_app.i18n import tx
 from supplier_app.models.entities import Document, DocumentReference, Party
 from supplier_app.models.enums import (
     DUNNING_DOC_LEVELS,
@@ -106,7 +107,7 @@ class IngestService(ServiceBase):
             return ImportOutcome(None, False, error=prepared.error or "Unbekannter Fehler")
         existing = self.repos.documents.get_by_hash(prepared.sha256)
         if existing is not None:
-            return ImportOutcome(existing, False, warnings=[f"'{prepared.source.name}' wurde bereits importiert."])
+            return ImportOutcome(existing, False, warnings=[tx(f"'{prepared.source.name}' wurde bereits importiert.")])
         try:
             doc, created = self.documents.store_file(prepared.source)
         except DocumentError as exc:
@@ -199,8 +200,8 @@ class IngestService(ServiceBase):
             days = self.settings.default_payment_days
             review.due_date = review.document_date + timedelta(days=days)
             review.confidence["due_date"] = 0.3
-            review.messages.append(
-                f"Kein Fälligkeitsdatum erkannt – Vorschlag: Rechnungsdatum + {days} Tage. Bitte prüfen oder ändern.")
+            review.messages.append(tx(
+                f"Kein Fälligkeitsdatum erkannt – Vorschlag: Rechnungsdatum + {days} Tage. Bitte prüfen oder ändern."))
         if review.kind in (KIND_INVOICE, KIND_CREDIT):
             review.net_cents, review.vat_cents, review.gross_cents = f.amount("net"), f.amount("vat"), f.amount("gross")
             for key in ("net", "vat", "gross"):

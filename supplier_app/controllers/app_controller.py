@@ -9,6 +9,7 @@ from typing import Any
 from PySide6.QtCore import QEvent, QObject, QTimer, Signal
 from PySide6.QtWidgets import QApplication
 
+from supplier_app.i18n import tx
 from supplier_app.main import AppContext
 from supplier_app.models.scope import ALL, Scope
 from supplier_app.views.theme import apply_theme
@@ -98,7 +99,7 @@ class AppController(QObject):
         except Exception:  # noqa: BLE001
             who = ""
         if who and who != self.ctx.services.session.username:
-            self.status.emit(f"Daten wurden von {who} aktualisiert.")
+            self.status.emit(tx(f"Daten wurden von {who} aktualisiert."))
         self.data_changed.emit()
         return True
 
@@ -119,6 +120,27 @@ class AppController(QObject):
         self.ctx.services.settings.set_theme(name)
         apply_theme(self.app, name)
         self.theme_changed.emit(name)
+
+    @property
+    def language(self) -> str:
+        return self.ctx.services.settings.language
+
+    def set_language(self, code: str) -> None:
+        """Save the interface language (takes effect at the next start of the program)."""
+        from supplier_app.settings.local_prefs import LocalPrefs
+
+        self.ctx.services.settings.set_language(code)
+        LocalPrefs(self.ctx.paths.local / "prefs.json").set("language", code)  # read before the database is opened
+
+    def restart_application(self) -> None:
+        """Start the program again (new language) and close this instance."""
+        import sys
+
+        from PySide6.QtCore import QProcess
+
+        args = sys.argv[1:] if getattr(sys, "frozen", False) else ["-m", "supplier_app", *sys.argv[1:]]
+        QProcess.startDetached(sys.executable, args)
+        self.app.quit()
 
     def toggle_theme(self) -> None:
         self.set_theme("light" if self.theme == "dark" else "dark")

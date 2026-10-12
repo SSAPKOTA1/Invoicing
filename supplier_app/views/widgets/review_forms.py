@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from supplier_app.i18n import level_label, tr
+from supplier_app.i18n import level_label, tr, tx
 from supplier_app.models.enums import DunningLevel, InvoiceStatus, PartyRole, PaymentMethod
 from supplier_app.services.container import Services
 from supplier_app.services.review_models import ClaimInput, ReviewData
@@ -356,8 +356,8 @@ class PaymentForm(BaseForm):
         sid = self.supplier.currentData()
         for s in self.svc.ledger.invoice_states(supplier_id=sid) if sid else []:
             if s.balance.balance_cents > 0 and s.invoice.status != InvoiceStatus.CANCELLED:
-                it = QListWidgetItem(f"{s.invoice.invoice_number} · fällig {format_date(s.invoice.due_date)} · "
-                                     f"offen {format_cents(s.balance.balance_cents)}")
+                it = QListWidgetItem(tx(f"{s.invoice.invoice_number} · fällig {format_date(s.invoice.due_date)} · "
+                                       f"offen {format_cents(s.balance.balance_cents)}"))
                 it.setData(Qt.ItemDataRole.UserRole, s.invoice.id)
                 it.setFlags(it.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                 it.setCheckState(Qt.CheckState.Checked if s.invoice.id in selected else Qt.CheckState.Unchecked)

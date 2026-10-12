@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QComboBox, QDialog, QLineEdit, QWidget
 
 from supplier_app.controllers.app_controller import AppController
 from supplier_app.errors import SupplierAppError
-from supplier_app.i18n import tr
+from supplier_app.i18n import tr, tx
 from supplier_app.util.money import percent_of
 from supplier_app.views.dialogs.forms import button_box, dialog_root, form_layout, message_label
 from supplier_app.views.errors import show_error
@@ -41,7 +41,7 @@ class InvoiceDialog(QDialog):
         self.category = QComboBox()
         self.category.addItem(tr("common.none"), None)
         for c in self.svc.repos.categories.list():
-            self.category.addItem(c.name, c.id)
+            self.category.addItem(tx(c.name), c.id)
         self.notes = QLineEdit()
         self.scope = ScopePicker(self.svc.organization)
         self.scope.set_values(ctrl.scope.company_id, ctrl.scope.hotel_id)

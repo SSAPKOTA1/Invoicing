@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import os
 import sys
 
 from PySide6.QtWidgets import QApplication
 
 from supplier_app.controllers.app_controller import AppController
 from supplier_app.errors import SupplierAppError
-from supplier_app.i18n import tr
+from supplier_app.i18n import set_language, tr
 from supplier_app.main import AppContext, build_context
 from supplier_app.settings.connection import ConnectionConfig
+from supplier_app.settings.local_prefs import saved_language
 from supplier_app.settings.paths import AppPaths, default_paths
 from supplier_app.views.dialogs.connection_dialog import ConnectionDialog
 from supplier_app.views.dialogs.login_dialog import FirstAdminDialog, LoginDialog
@@ -53,9 +55,10 @@ def sign_in(ctx: AppContext) -> str:
 def run_application() -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     app.setApplicationName("SupplierApp")
+    paths = default_paths().ensure()
+    set_language(os.environ.get("SUPPLIERAPP_LANGUAGE") or saved_language(paths.local) or "de")  # also for the first dialogs
     app.setApplicationDisplayName(tr("app.title"))
     install_excepthook()
-    paths = default_paths().ensure()
     while True:
         ctx = open_context(paths)
         if ctx is None:

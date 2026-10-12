@@ -30,9 +30,20 @@ class LocalPrefs:
         return self._data.get(key)
 
     def set(self, key: str, value: str) -> None:
+        try:  # merge with the file: another instance (e.g. the language written at start-up) may have saved meanwhile
+            if self.path.exists():
+                loaded = json.loads(self.path.read_text(encoding="utf-8"))
+                self._data = {**{str(k): str(v) for k, v in loaded.items()}, **self._data}
+        except (OSError, ValueError):
+            pass
         self._data[key] = value
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             self.path.write_text(json.dumps(self._data, ensure_ascii=False, indent=1), encoding="utf-8")
         except OSError:
             log.warning("preferences could not be saved", exc_info=True)
+
+
+def saved_language(local_dir: Path | str) -> str:
+    """The interface language chosen on this PC ('' when none; read before the database is opened)."""
+    return LocalPrefs(Path(local_dir) / "prefs.json").get("language") or ""

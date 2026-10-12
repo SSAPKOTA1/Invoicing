@@ -7,6 +7,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from supplier_app.errors import ValidationError
+from supplier_app.i18n import LANGUAGES
 from supplier_app.models.entities import InterestRate
 from supplier_app.models.enums import AllocationRule
 from supplier_app.repositories.interfaces import Repositories
@@ -86,6 +87,15 @@ class SettingsService(ServiceBase):
         if theme not in ("dark", "light"):
             raise ValidationError("Unbekanntes Design.")
         self.set("theme", theme)
+
+    @property
+    def language(self) -> str:
+        return self.get("language") if self.get("language") in LANGUAGES else "de"
+
+    def set_language(self, language: str) -> None:
+        if language not in LANGUAGES:
+            raise ValidationError("Unbekannte Sprache.")
+        self.set("language", language)
 
     @property
     def allocation_rule(self) -> AllocationRule:

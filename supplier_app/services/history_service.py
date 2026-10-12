@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from supplier_app.errors import NotFoundError
-from supplier_app.i18n import level_label, tr
+from supplier_app.i18n import level_label, tr, tx
 from supplier_app.models.entities import Case, DunningNotice, Invoice
 from supplier_app.models.enums import DunningLevel, LedgerEntryType
 from supplier_app.repositories.interfaces import Repositories
@@ -97,7 +97,7 @@ class HistoryService(ServiceBase):
                 title = f"{tr('entry.REVERSAL')} ({tr(f'entry.{e.category_type.value}')})"
             item = HistoryItem(
                 e.entry_date, "entry", title, e.amount_cents, running.get(e.id), e.entry_type, e.id, e.notice_id,
-                e.document_id, comment=e.comment, reversed=e.id in reversed_ids)
+                e.document_id, comment=tx(e.comment), reversed=e.id in reversed_ids)
             sortable.append(((e.entry_date, order.get(e.entry_type, 2), e.id), item))
         for n in notices:
             assert n.id is not None
@@ -109,7 +109,7 @@ class HistoryService(ServiceBase):
                 n.notice_date, "notice", f"{level_label(int(n.level))} – {sender.name if sender else '?'}",
                 notice_id=n.id, document_id=n.document_id, level=n.level,
                 claimed_cents=claim.total_cents or claim.principal_cents, expected_cents=rec.expected_cents,
-                warnings=warns, comment=n.notes)
+                warnings=warns, comment=tx(n.notes))
             sortable.append(((n.notice_date, 1, n.id), item))
         sortable.sort(key=lambda t: t[0])
         balance = self.ledger.invoice_balance(invoice_id)

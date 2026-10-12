@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Any
 
+from supplier_app.i18n import tx
 from supplier_app.models.scope import ALL, Scope
 
 
@@ -86,6 +87,10 @@ class AttentionItem:
     open_id: int | None = None
     days_left: int | None = None
 
+    def __post_init__(self) -> None:
+        self.title = tx(self.title)
+        self.subtitle = tx(self.subtitle)
+
 
 @dataclass
 class ActivityItem:
@@ -93,6 +98,9 @@ class ActivityItem:
     text: str
     open_kind: str = ""
     open_id: int | None = None
+
+    def __post_init__(self) -> None:
+        self.text = tx(self.text)
 
 
 @dataclass
@@ -126,3 +134,7 @@ class DrillResult:
     rows: list[DrillRow]
     total_cents: int | None  # None for count lists
     count: int
+
+    def __post_init__(self) -> None:
+        self.title = tx(self.title)
+        self.columns = [tx(c) for c in self.columns]

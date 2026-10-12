@@ -83,6 +83,12 @@ Beim Import steht im Prüfformular das Feld **Fälligkeitsdatum** (mit Schaltfl�
 Die Erkennung kennt Rechnungen auf Deutsch, Englisch, Französisch, Italienisch, Spanisch und Niederländisch: Überschriften wie *Rechnung, Beleg, Faktura, Honorarnote, Abrechnung, Invoice, Tax invoice, Facture, Fattura, Factura, Factuur*; Beträge als *Netto / Brutto / MwSt*, *Summe, Gesamt, Total, Gesamtbetrag, Endsumme, Zu zahlen, Rechnungsbetrag*, *Montant HT / Total TTC / TVA*, *Imponibile / IVA / Totale*, *Base imponible / Total factura*, *Subtotaal / BTW / Totaal*; Zahlen in Tabellen (Spalten „Netto – MwSt – Brutto“, Summenzeile „Gesamt 100,00 19,00 119,00“), mehrere Steuersätze, Zahlformate wie `1.234,56`, `1 234,56`, `1'234.56`, `1,234.56`; Daten wie `15.03.2024`, `15/03/24`, `15 March 2024`, `15 mars 2024`; Zahlungsziele wie *30 Tage netto*, *Net 30*, *Zahlbar bis …*, *sofort fällig* (Skonto-Daten werden nicht als Fälligkeit gelesen).
 Netto, MwSt und Brutto werden gegeneinander geprüft (Netto + MwSt = Brutto). Fehlt ein Wert, wird er berechnet und im Prüfformular als „berechnet“ markiert. Eigene Begriffe für einzelne Lieferanten tragen Sie unter **Einstellungen → Erkennung: eigene Begriffe** ein.
 
+### Sprache: Deutsch / English
+
+*Einstellungen → Darstellung → Sprache* (Deutsch oder English). Die Wahl gilt für diesen PC und wird beim nächsten Start wirksam (die Anwendung bietet den Neustart direkt an). Übersetzt sind alle Bildschirme, Dialoge, Fehlermeldungen, Hinweise der Dokumentenerkennung und die Überschriften der Berichte (CSV/Excel/PDF/Druck). Zum Ausprobieren: `SupplierApp.exe --language en`.
+
+Gleich bleiben: Zahlen- und Datumsformat (`1.234,56 €`, `31.12.2024`), Beispieldaten und die Texte der Dokumente selbst; die Erkennung versteht deutsche, englische, französische, italienische, spanische und niederländische Belege unabhängig von der Oberfläche. Buchungstexte werden in der Datenbank deutsch gespeichert und beim Anzeigen übersetzt, deshalb sehen Kollegen mit anderer Sprache dieselben Buchungen in ihrer Sprache.
+
 ### Berichte drucken
 
 Berichte → **Druckvorschau …** / **Drucken …**: A4 mit Kopfzeile (Titel, Filter, Gesellschaft/Hotel), wiederholter Tabellenkopf auf jeder Seite und „Seite x von y“. Breite Tabellen werden quer gedruckt (in der Vorschau/im Druckdialog änderbar). Über einen PDF-Drucker lässt sich auch eine PDF-Datei erzeugen.
@@ -169,7 +175,7 @@ diese Tests mit Begründung übersprungen.
 * `ocr/` – PDF-Textebene, Tesseract (`deu+eng`, gebündelt → Einstellungen → PATH), OpenCV-Vorverarbeitung.
 * `ai/` – regelbasiert (kein LLM): `DocumentClassifier`, `FieldExtractor`, `ReferenceExtractor`, `SenderMatcher`, `LinkMatcher` hinter Interfaces.
 * `reports/` – Berichte und CSV/Excel/PDF-Export, Dashboard-Export (PNG/PDF).
-* `i18n/de.json` – alle UI-Texte.
+* `i18n/de.json`, `i18n/en.json` – alle UI-Texte (gleiche Schlüssel, Platzhalter und Reihenfolge; ein Test prüft die Gleichheit). `i18n/messages.py` – englische Fassung der vom Programm selbst erzeugten deutschen Texte (Fehlermeldungen, Hinweise, Berichtsüberschriften); sie wird mit `tx()` angewendet, ein Test stellt sicher, dass jede Fehlermeldung im Code dort steht. Neue Sprache: `<code>.json` anlegen und in `LANGUAGES` eintragen.
 
 Dokumentation: `docs/DECISIONS.md` (Annahmen), `docs/VERIFICATION.md` (Nachweise), `TASK.md` (Arbeitsstand).
 

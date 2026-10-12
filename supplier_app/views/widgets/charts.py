@@ -19,6 +19,7 @@ from PySide6.QtCore import QMargins, Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QSizePolicy, QToolTip
 
+from supplier_app.i18n import tx
 from supplier_app.util.money import format_cents
 from supplier_app.views.theme import tokens
 
@@ -127,7 +128,7 @@ def _cursor_pos():
 
 
 def trend_chart(months: Sequence[str], invoiced: Sequence[int], paid: Sequence[int], balance: Sequence[int],
-                theme: str, names: tuple[str, str, str] = ("Rechnungen", "Zahlungen", "Saldo")) -> QChartView:
+                theme: str, names: tuple[str, str, str] = (tx("Rechnungen"), tx("Zahlungen"), tx("Saldo"))) -> QChartView:
     chart = QChart()
     bars = QBarSeries()
     inv_set, paid_set = QBarSet(names[0]), QBarSet(names[1])
@@ -183,7 +184,7 @@ def donut_chart(labels: Sequence[str], values: Sequence[int], colors: Sequence[s
         if on_click:
             sl.clicked.connect(lambda n=i: on_click(n))
     if total == 0:
-        sl = series.append("keine Daten", 1.0)
+        sl = series.append(tx("keine Daten"), 1.0)
         sl.setColor(QColor(tokens(theme)["surface3"]))
     chart.addSeries(series)
     _style_chart(chart, theme, legend=True)

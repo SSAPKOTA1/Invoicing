@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from supplier_app.controllers.app_controller import AppController
-from supplier_app.i18n import level_label, tr
+from supplier_app.i18n import level_label, tr, tx
 from supplier_app.models.enums import InvoiceStatus, LedgerEntryType
 from supplier_app.services.ledger import AGING_BUCKETS
 from supplier_app.util.dates import format_date
@@ -235,7 +235,7 @@ class SuppliersPage(Page):
                 label += f" ({tr('entry.' + e.category_type.value)})"
             tone = "muted" if r.reversed else ""
             rows.append(Row([format_date(e.entry_date), Cell(r.invoice_number, tone=tone), Cell(label, tone=tone),
-                             Cell(e.comment, tone=tone), Cell(format_cents(d_amt) if d_amt else "", d_amt, "right"),
+                             Cell(tx(e.comment), tone=tone), Cell(format_cents(d_amt) if d_amt else "", d_amt, "right"),
                              Cell(format_cents(c_amt) if c_amt else "", c_amt, "right", "ok" if c_amt else ""),
                              Cell(format_cents(r.running_cents), r.running_cents, "right")], e.invoice_id))
         self.statement.set_data([tr("common.date"), tr("invoice.number"), tr("history.col.kind"), tr("history.col.text"),

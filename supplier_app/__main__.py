@@ -9,11 +9,19 @@ import sys
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="supplier_app", description="Lieferantenkonto & Mahnungs-Tracker")
     parser.add_argument("--selfcheck", action="store_true", help="headless start-up check, exit code 0 when ok")
+    parser.add_argument("--language", choices=("de", "en"), help="interface language for this run (default: the saved one)")
     parser.add_argument("--data-dir", help="use this data folder instead of %%APPDATA%%/SupplierApp")
     parser.add_argument("--reset-pin", action="store_true", help="remove the PIN lock (documented recovery path)")
     parser.add_argument("--set-password", metavar="USER", help="multi-user mode: set a new password for USER (lost password)")
     parser.add_argument("--screenshots", metavar="DIR", help="render all screens (dark+light) with demo data to DIR")
     args = parser.parse_args(argv)
+    if args.language:
+        import os
+
+        from supplier_app.i18n import set_language
+
+        os.environ["SUPPLIERAPP_LANGUAGE"] = args.language
+        set_language(args.language)
     if args.data_dir:
         import os
 

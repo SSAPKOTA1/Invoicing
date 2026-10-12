@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING
 
-from supplier_app.i18n import level_label, tr
+from supplier_app.i18n import level_label, tr, tx
 from supplier_app.models.enums import InvoiceStatus, LedgerEntryType
 from supplier_app.models.scope import ALL, Scope
 from supplier_app.services.ledger import AGING_BUCKETS, aging_bucket
@@ -35,6 +35,10 @@ class ReportService:
             text = f"bis {format_date(date_to)}"
         else:
             text = "gesamter Zeitraum"
+        return text if scope.is_all else f"{text} · {self.svc.organization.label(scope)}"
+
+    def _as_of_text(self, as_of: date, scope: Scope = ALL) -> str:
+        text = f"Stichtag {format_date(as_of)}"
         return text if scope.is_all else f"{text} · {self.svc.organization.label(scope)}"
 
     def build(self, kind: str, *, supplier_id: int | None = None, date_from: date | None = None,
@@ -72,10 +76,10 @@ class ReportService:
             label = tr(f"entry.{e.entry_type.value}")
             if e.entry_type == LedgerEntryType.REVERSAL:
                 label = f"{label} ({tr('entry.' + e.category_type.value)})"
-            rows.append([format_date(e.entry_date), r.invoice_number, label, e.comment,
+            rows.append([format_date(e.entry_date), r.invoice_number, label, tx(e.comment),
                          format_cents(d_amt) if d_amt else "", format_cents(c_amt) if c_amt else "",
                          format_cents(r.running_cents)])
-            raw.append([e.entry_date, r.invoice_number, label, e.comment, d_amt, c_amt, r.running_cents])
+            raw.append([e.entry_date, r.invoice_number, label, tx(e.comment), d_amt, c_amt, r.running_cents])
         return ReportTable(
             title=f"Kontoblatt {self._name(supplier_id)}", subtitle=self._period(date_from, date_to, scope), columns=cols,
             rows=rows, raw_rows=raw, money_columns={4, 5, 6}, totals=[None, None, None, "Summe / Schlusssaldo", debit,
@@ -106,11 +110,11 @@ class ReportService:
                                sum(r[9] for r in raw), None]
         aging = self.svc.ledger.aging(as_of, supplier_id, scope)
         aging_rows = [[tr(f"aging.{b}"), format_cents(aging[b])] for b in AGING_BUCKETS]
-        aging_table = ReportTable("Fälligkeitsstruktur", self._period(None, as_of, scope).replace("bis", "Stichtag"), ["Fälligkeit", "Offen"],
+        aging_table = ReportTable("Fälligkeitsstruktur", self._as_of_text(as_of, scope), ["Fälligkeit", "Offen"],
                                   aging_rows, [[tr(f"aging.{b}"), aging[b]] for b in AGING_BUCKETS], {1},
                                   [None, sum(aging.values())])
         name = self._name(supplier_id) if supplier_id else "alle Lieferanten"
-        subtitle = f"Stichtag {format_date(as_of)}" + ("" if scope.is_all else f" · {self.svc.organization.label(scope)}")
+        subtitle = self._as_of_text(as_of, scope)
         return ReportTable(f"Offene Posten – {name}", subtitle, cols, rows, raw,
                            {6, 7, 8, 9}, totals, extra=[aging_table])
 

@@ -7,7 +7,7 @@ CI target: GitHub Actions `windows-latest`, Python 3.11 (see the CI section at t
 | # | Item (Definition of Done) | Result | Proof |
 |---|---|---|---|
 | 1 | All six phases checked off in `TASK.md`; one commit per phase | PASS | `git log --oneline` shows commits `Phase 1` … `Phase 6` (Phase 5's commit is empty: the reporting code was committed together with Phase 4, noted in its message) |
-| 2 | `pytest` passes with coverage targets | PASS | `python -m pytest tests --cov=supplier_app` → 173 passed, TOTAL 95 %; `python scripts/check_coverage.py coverage.xml`: services/ledger 99.2 % (≥ 90), repositories 98.6 %, database/migrations 96.9 %, ai 94.1 %, services 96.6 % (≥ 80) |
+| 2 | `pytest` passes with coverage targets | PASS | `python -m pytest tests --cov=supplier_app` → 383 tests (on SQLite and, with `SUPPLIER_TEST_PG_DSN`, on PostgreSQL 16), TOTAL ≥ 95 %; `python scripts/check_coverage.py coverage.xml`: services/ledger 99.2 % (≥ 90), repositories 97.8 %, database 92.1 %, ai 95.6 %, services 97.1 % (≥ 80) |
 | 3 | `python -m supplier_app --selfcheck` exits 0, every screen builds offscreen dark + light | PASS | output `14 screen/theme combinations built offscreen`, exit 0 (also with the PyInstaller build on Linux: `SupplierAppConsole --selfcheck` → 0) |
 | 4 | Worked example = exactly 615,00 € open, "partially paid" | PASS | `tests/test_ledger_engine.py::test_worked_example_from_spec` (engine) and `tests/test_services_core.py::test_worked_example_end_to_end` (services, DB) |
 | 5 | End-to-end scenario: scan invoice → 1st Mahnung → 2nd Mahnung from collection agency with new reference → partial payment; one invoice, correct balance, history, discrepancy flags | PASS | `tests/test_e2e_scenario.py`: PDF text layers and real OCR of scanned PNG/JPG (`test_scenario_with_scanned_images`, needs Tesseract), plus court-order discrepancy flags and the collection letter with deduction |
@@ -33,6 +33,8 @@ CI target: GitHub Actions `windows-latest`, Python 3.11 (see the CI section at t
 * Shared folder (no server): two PCs on one folder see each other's users/bookings/documents, five threads and four separate processes paying the same invoice at once pay it exactly once, identical invoice numbers are rejected once, daily backup/pruning, damaged-file detection, session heartbeat, restore refused while colleagues are connected, local -> shared transfer, connection dialog and start flow (`tests/test_shared.py`).
 * Printing: reports are rendered through the print code path into PDF (preview dialog, print dialog and direct PDF), multi-page output with repeated header row and page numbers verified visually (`test_reports_print_preview_and_pdf`).
 * Exported report numbers equal the ledger (`tests/test_reports.py`: CSV, Excel and PDF are parsed back and compared).
+
+* English interface: `en.json` is complete (same keys and placeholders as `de.json`); every screen, dialog, review panel, drill-down, report and invoice history is opened in English with demo data and checked for German function words; every error message of the source code has an English text; saving/restoring the language, the settings selector with restart, the `--language` option and the English report headings are tested (`tests/test_i18n.py`, `tests/test_english.py`).
 
 ## Known limitations
 

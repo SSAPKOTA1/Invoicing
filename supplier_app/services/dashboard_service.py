@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, timedelta
 
-from supplier_app.i18n import level_label, tr
+from supplier_app.i18n import level_label, tr, tx
 from supplier_app.models.entities import Invoice
 from supplier_app.models.enums import (
     CHARGE_TYPES,
@@ -326,7 +326,7 @@ class DashboardService(ServiceBase):
             if label is None:
                 continue
             kind = {"invoice": "invoice", "document": "document", "case": "case", "party": "supplier"}.get(a.entity, "")
-            text = f"{label}{': ' + a.details if a.details else ''}"
+            text = f"{tx(label)}{': ' + a.details if a.details else ''}"
             items.append(ActivityItem(a.created_at[:16].replace("T", " "), text, kind, a.entity_id))
             if len(items) >= limit:
                 break
@@ -347,7 +347,7 @@ class DashboardService(ServiceBase):
                               format_date(inv.due_date), format_cents(-bal)], -bal, "invoice", inv.id)
                     for inv, bal in self._select("credits", "", flt, states)]
             for p in self._unapplied(flt):
-                rows.append(DrillRow([self._supplier_name(p.payment.supplier_id), "Guthaben (Zahlung)",
+                rows.append(DrillRow([self._supplier_name(p.payment.supplier_id), tx("Guthaben (Zahlung)"),
                                       format_date(p.payment.payment_date), format_cents(p.amount_cents)],
                                      p.amount_cents, "supplier", p.payment.supplier_id))
             return DrillResult(tr("dash.kpi.credits"), ["Lieferant", "Rechnung", "Datum", "Guthaben"], rows,
@@ -410,7 +410,7 @@ class DashboardService(ServiceBase):
                                                      date_to=flt.date_to) if e.category_type.value in wanted]
         sign = -1 if kind == "paid" else 1
         rows = [DrillRow([format_date(e.entry_date), self._supplier_name(e.supplier_id),
-                          tr(f"entry.{e.entry_type.value}"), e.comment, format_cents(sign * e.amount_cents)],
+                          tr(f"entry.{e.entry_type.value}"), tx(e.comment), format_cents(sign * e.amount_cents)],
                          sign * e.amount_cents, "invoice" if e.invoice_id else "supplier", e.invoice_id or e.supplier_id)
                 for e in entries]
         title = tr("dash.kpi.paid_period") if kind == "paid" else tr("dash.kpi.charges")

@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
 from supplier_app.ai.vocab import EXTRA_VOCAB_KEYS
 from supplier_app.controllers.app_controller import AppController
 from supplier_app.errors import SupplierAppError
-from supplier_app.i18n import tr
+from supplier_app.i18n import LANGUAGES, current_language, tr
 from supplier_app.models.enums import AllocationRule, ReferenceType
 from supplier_app.util.dates import format_date
 from supplier_app.views.dialogs.connection_dialog import ConnectionDialog
@@ -43,6 +43,7 @@ class SettingsPage(Page):
 
     def __init__(self, ctrl: AppController) -> None:
         super().__init__(ctrl)
+        self._pending_language = ""  # chosen, but active only after the restart
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         content = QWidget()
@@ -64,7 +65,27 @@ class SettingsPage(Page):
         self.theme.addItem(tr("settings.theme.light"), "light")
         self.theme.activated.connect(lambda _i: self.ctrl.set_theme(self.theme.currentData()))
         card.add(self.theme)
+        self.language = QComboBox()
+        for code, name in LANGUAGES.items():
+            self.language.addItem(name, code)
+        self.language.activated.connect(lambda _i: self._language_chosen())
+        form = QFormLayout()
+        form.addRow(tr("settings.language"), self.language)
+        card.layout_.addLayout(form)
+        card.add(muted(tr("settings.language.hint")))
         return card
+
+    def _language_chosen(self) -> None:
+        code = str(self.language.currentData())
+        if code == current_language():
+            self._pending_language = ""
+            return
+        self._pending_language = code
+        self.ctrl.set_language(code)
+        if confirm(self, tr("settings.language.restart")):
+            self.ctrl.restart_application()
+        else:
+            info(self, tr("settings.language.later"))
 
     def _organization(self) -> Card:
         card = Card(tr("org.title"))
@@ -389,6 +410,7 @@ class SettingsPage(Page):
         self._refresh_multi_user()
         s = self.svc.settings
         self.theme.setCurrentIndex(self.theme.findData(s.theme))
+        self.language.setCurrentIndex(self.language.findData(self._pending_language or current_language()))
         enabled = self.svc.pin.enabled
         self.pin_state.setText(tr("settings.pin.on") if enabled else tr("settings.pin.off"))
         self.btn_set.setEnabled(not enabled)

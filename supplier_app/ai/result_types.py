@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import date
 from typing import Any
 
+from supplier_app.i18n import tx
 from supplier_app.models.enums import DocumentType, ReferenceType
 
 Span = tuple[int, int]
@@ -97,6 +98,9 @@ class ValidationIssue:
     message: str
     field_name: str = ""
     severity: str = "warning"  # 'warning' | 'error'
+
+    def __post_init__(self) -> None:
+        self.message = tx(self.message)
 
 
 @dataclass

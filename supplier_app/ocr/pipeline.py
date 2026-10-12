@@ -11,6 +11,7 @@ from pathlib import Path
 from PIL import Image
 
 from supplier_app.errors import DocumentError, OcrError, TesseractMissingError
+from supplier_app.i18n import tx
 
 from .preprocess import preprocess
 from .tesseract import TesseractRunner
@@ -77,7 +78,7 @@ class TextExtractor:
     def _finish(result: ExtractedText) -> ExtractedText:
         result.text = unicodedata.normalize("NFC", result.text)
         if result.empty:
-            result.warnings.append("Es wurde kein Text erkannt. Bitte Dokument manuell erfassen.")
+            result.warnings.append(tx("Es wurde kein Text erkannt. Bitte Dokument manuell erfassen."))
         return result
 
     def _from_pdf(self, path: Path, progress: Progress | None) -> ExtractedText:
@@ -106,14 +107,14 @@ class TextExtractor:
                     confs.append(1.0)
                     continue
                 if ocr_pages >= MAX_OCR_PAGES:
-                    warnings.append(f"Nur die ersten {MAX_OCR_PAGES} gescannten Seiten wurden per OCR gelesen.")
+                    warnings.append(tx(f"Nur die ersten {MAX_OCR_PAGES} gescannten Seiten wurden per OCR gelesen."))
                     break
                 try:
                     pix = doc[i].get_pixmap(dpi=300)
                     image = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
                     text, conf = self._ocr(image)
                 except TesseractMissingError:
-                    warnings.append("Gescannte Seite(n) ohne Text: Tesseract fehlt, keine OCR möglich.")
+                    warnings.append(tx("Gescannte Seite(n) ohne Text: Tesseract fehlt, keine OCR möglich."))
                     texts.append(layer)
                     break
                 ocr_pages += 1
@@ -121,7 +122,7 @@ class TextExtractor:
                 texts.append(text or layer)
                 confs.append(conf)
             if pages > MAX_TEXT_PAGES:
-                warnings.append(f"Das Dokument hat {pages} Seiten; nur {MAX_TEXT_PAGES} wurden gelesen.")
+                warnings.append(tx(f"Das Dokument hat {pages} Seiten; nur {MAX_TEXT_PAGES} wurden gelesen."))
         source = "mixed" if used_layer and used_ocr else "text_layer" if used_layer else "ocr" if used_ocr else ""
         return ExtractedText("\n\n".join(t for t in texts if t), pages, source,
                              sum(confs) / len(confs) if confs else 0.0, warnings)
@@ -149,6 +150,6 @@ class TextExtractor:
             texts.append(text)
             confs.append(conf)
         if frames > MAX_OCR_PAGES:
-            warnings.append(f"Nur die ersten {MAX_OCR_PAGES} Seiten wurden gelesen.")
+            warnings.append(tx(f"Nur die ersten {MAX_OCR_PAGES} Seiten wurden gelesen."))
         return ExtractedText("\n\n".join(t for t in texts if t), frames, "ocr",
                              sum(confs) / len(confs) if confs else 0.0, warnings)

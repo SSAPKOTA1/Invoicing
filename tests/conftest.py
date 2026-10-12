@@ -96,6 +96,16 @@ def file_svc(file_storage: Storage) -> Services:
 
 
 @pytest.fixture(autouse=True)
+def _german_by_default():
+    """Tests that switch the interface language must not leak it into other tests."""
+    from supplier_app.i18n import set_language
+
+    set_language("de")
+    yield
+    set_language("de")
+
+
+@pytest.fixture(autouse=True)
 def _no_modal_dialogs(monkeypatch):
     """Modal dialogs would block a headless test run: make exec() return immediately."""
     try:

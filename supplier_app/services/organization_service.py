@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from supplier_app.errors import NotFoundError, ValidationError
+from supplier_app.i18n import tx
 from supplier_app.models.entities import Company, Hotel
 from supplier_app.models.scope import ALL, Scope
 from supplier_app.repositories.interfaces import Repositories
@@ -128,13 +129,13 @@ class OrganizationService(ServiceBase):
 
     def label(self, scope: Scope | None) -> str:
         if scope is None or scope.is_all:
-            return "Alle Gesellschaften"
+            return tx("Alle Gesellschaften")
         if scope.hotel_id is not None:
             hotel = self.repos.organization.get_hotel(scope.hotel_id)
             company = self.repos.organization.get_company(hotel.company_id) if hotel else None
-            return f"{company.name} / {hotel.name}" if hotel and company else "Hotel"
+            return f"{company.name} / {hotel.name}" if hotel and company else tx("Hotel")
         company = self.repos.organization.get_company(scope.company_id or 0)
-        return f"{company.name} (alle Hotels)" if company else "Gesellschaft"
+        return tx(f"{company.name} (alle Hotels)") if company else tx("Gesellschaft")
 
     def item_label(self, company_id: int | None, hotel_id: int | None) -> str:
         """Short text for tables: ``Hotel (Firma)``, ``Firma`` or ``–``."""
@@ -148,10 +149,10 @@ class OrganizationService(ServiceBase):
         return "–"
 
     def choices(self) -> list[ScopeChoice]:
-        out = [ScopeChoice(ALL, "Alle Gesellschaften", 0)]
+        out = [ScopeChoice(ALL, tx("Alle Gesellschaften"), 0)]
         hotels = self.repos.organization.hotels()
         for company in self.companies():
-            out.append(ScopeChoice(Scope(company.id), f"{company.name} (alle Hotels)", 1))
+            out.append(ScopeChoice(Scope(company.id), tx(f"{company.name} (alle Hotels)"), 1))
             out.extend(ScopeChoice(Scope(company.id, h.id), h.name, 2) for h in hotels if h.company_id == company.id)
         return out
 

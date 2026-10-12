@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
+from supplier_app.i18n import tx
 from supplier_app.models.enums import DocumentType as D
 from supplier_app.util.money import format_cents, percent_of
 from supplier_app.util.normalize import valid_iban, valid_vat_id
@@ -36,7 +37,7 @@ def validate_fields(
                 pass
         derived = sorted(fields.derived & {"net", "vat", "gross"})
         if derived:
-            names = {"net": "Netto", "vat": "MwSt", "gross": "Brutto"}
+            names = {"net": tx("Netto"), "vat": tx("MwSt"), "gross": tx("Brutto")}
             issues.append(ValidationIssue(
                 "AMOUNT_DERIVED", f"{' / '.join(names[k] for k in derived)} wurde aus den übrigen Beträgen berechnet "
                 f"und nicht im Dokument gelesen – bitte prüfen.", derived[0]))

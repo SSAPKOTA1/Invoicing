@@ -1,12 +1,16 @@
-"""Custom exception hierarchy. User-facing messages are German."""
+"""Custom exception hierarchy. User-facing messages are written in German and translated by ``tx`` when another language is active."""
 
 from __future__ import annotations
+
+from supplier_app.i18n import tx
 
 
 class SupplierAppError(Exception):
     """Base class for all application errors; the message is safe to show to the user."""
 
     def __init__(self, message: str, *, hint: str | None = None) -> None:
+        message = tx(message)
+        hint = tx(hint) if hint else hint
         super().__init__(message)
         self.message = message
         self.hint = hint

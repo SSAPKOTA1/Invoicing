@@ -541,5 +541,9 @@
  "settings.database.transfer_shared.confirm": "Alle Daten und Dokumente dieses PCs werden in den (leeren) Ordner {path} kopiert. Die lokalen Daten bleiben unverändert erhalten. Danach arbeitet die Anwendung im Mehrbenutzer-Modus mit diesem Ordner (erster Start: Administrator anlegen). Fortfahren?",
  "settings.database.transfer_shared.done": "Die Daten wurden kopiert ({n} Dateien). Die Anwendung wird jetzt beendet; beim nächsten Start melden Sie sich an. Auf den anderen PCs: Einstellungen → Verbindung ändern → gemeinsamer Ordner.",
  "settings.database.all_pcs": "Ordner für alle PCs hinterlegen",
- "settings.database.all_pcs.done": "Gespeichert in {path}. Jeder PC, der das Programm aus diesem Programmordner startet, verwendet jetzt automatisch den gemeinsamen Daten-Ordner (nur das Anmelden ist noch nötig)."
+ "settings.database.all_pcs.done": "Gespeichert in {path}. Jeder PC, der das Programm aus diesem Programmordner startet, verwendet jetzt automatisch den gemeinsamen Daten-Ordner (nur das Anmelden ist noch nötig).",
+ "settings.language": "Sprache",
+ "settings.language.hint": "Die Sprache der Oberfläche wird für diesen PC gespeichert und gilt ab dem nächsten Start.",
+ "settings.language.restart": "Die Sprache wird beim nächsten Start geändert. Jetzt neu starten?",
+ "settings.language.later": "Die Sprache ändert sich beim nächsten Start der Anwendung."
 }

@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QLineEdit, QMenu, QVBoxLayout
 
 from supplier_app.controllers.app_controller import AppController
-from supplier_app.i18n import tr
+from supplier_app.i18n import tr, tx
 from supplier_app.models.enums import LedgerEntryType
 from supplier_app.util.dates import format_date
 from supplier_app.util.money import format_cents
@@ -119,7 +119,7 @@ class TransactionsPage(Page):
                              Cell(numbers.get(e.invoice_id, "") if e.invoice_id else tr("transactions.credit_account"), tone=tone),
                              Cell(where(e), tone=tone), Cell(label, tone=tone),
                              Cell(format_cents(e.amount_cents, plus=True), e.amount_cents, "right",
-                                  "ok" if e.amount_cents < 0 else ""), Cell(e.comment, tone=tone),
+                                  "ok" if e.amount_cents < 0 else ""), Cell(tx(e.comment), tone=tone),
                              Cell("📎" if e.document_id else "", align="center")], (e.invoice_id, e.id)))
         self.table.set_data([tr("common.date"), tr("supplier.name"), tr("invoice.number"), tr("org.hotel_company"),
                              tr("history.col.kind"), tr("common.amount"), tr("history.col.text"), ""], rows,
