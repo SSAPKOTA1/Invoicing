@@ -39,6 +39,10 @@ class AssignmentMissingError(ValidationError):
     """A document has no invoice assigned. The user may still file it (and assign the invoice later) after a warning."""
 
 
+class AccountRequiredError(ValidationError):
+    """The statement does not say which of the own bank accounts it belongs to; the user has to choose."""
+
+
 class LedgerError(SupplierAppError):
     """A ledger rule would be violated."""
 

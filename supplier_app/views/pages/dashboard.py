@@ -37,7 +37,8 @@ KPI_ORDER = ["total_open", "overdue", "due_7", "due_14", "due_30", "paid_period"
 PERIODS = ["month", "quarter", "year", "custom"]
 ATTENTION = [("new_notices", "dash.attention.new_notices"), ("deadlines", "dash.attention.deadlines"),
              ("discrepancies", "dash.attention.discrepancies"), ("low_confidence", "dash.attention.low_confidence"),
-             ("unassigned", "dash.attention.unassigned"), ("duplicates", "dash.attention.duplicates"), ("credits", "dash.attention.credits")]
+             ("unassigned", "dash.attention.unassigned"), ("bank", "dash.attention.bank"),
+             ("duplicates", "dash.attention.duplicates"), ("credits", "dash.attention.credits")]
 
 
 class DashboardPage(Page):
@@ -293,6 +294,8 @@ class DashboardPage(Page):
             self.ctrl.open_document.emit(item.open_id)
         elif item.open_kind == "supplier" and item.open_id:
             self.ctrl.open_supplier.emit(item.open_id)
+        elif item.open_kind == "page" and item.target:
+            self.ctrl.navigate.emit(item.target.kind)
         elif item.target:
             self._drill(item.target)
 

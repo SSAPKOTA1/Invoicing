@@ -24,19 +24,22 @@ def test_dynamic_enum_keys_exist() -> None:
     from supplier_app.models.enums import (
         AllocationComponent,
         AllocationRule,
+        BankTxStatus,
         CaseStatus,
         DocumentType,
         InvoiceStatus,
         LedgerEntryType,
         PartyRole,
         PaymentMethod,
+        RecurrencePeriod,
         ReferenceType,
         ReviewStatus,
     )
     keys = all_keys("de")
     for prefix, enum in (("entry", LedgerEntryType), ("status", InvoiceStatus), ("case", CaseStatus),
                          ("doctype", DocumentType), ("review", ReviewStatus), ("role", PartyRole), ("ref", ReferenceType),
-                         ("method", PaymentMethod), ("component", AllocationComponent), ("rule", AllocationRule)):
+                         ("method", PaymentMethod), ("component", AllocationComponent), ("rule", AllocationRule),
+                         ("recurring.period", RecurrencePeriod), ("bank.status", BankTxStatus)):
         for member in enum:
             assert f"{prefix}.{member.value}" in keys, f"{prefix}.{member.value}"
     for lv in range(1, 7):

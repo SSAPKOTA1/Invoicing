@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from .enums import (
     AllocationComponent,
+    BankTxStatus,
     CaseStatus,
     DocumentType,
     DunningLevel,
@@ -291,4 +292,60 @@ class RecurringInvoice:
     hotel_id: int | None = None
     active: bool = True
     amounts: list[RecurringAmount] = field(default_factory=list)
+    created_at: str = ""
+
+
+@dataclass
+class BankAccount:
+    """One of the user's own bank accounts (statements are imported per account)."""
+
+    name: str
+    iban: str
+    id: int | None = None
+    bic: str = ""
+    company_id: int | None = None
+    hotel_id: int | None = None
+    notes: str = ""
+    created_at: str = ""
+
+
+@dataclass
+class BankStatement:
+    source_name: str
+    file_hash: str
+    format: str
+    id: int | None = None
+    account_id: int | None = None
+    date_from: date | None = None
+    date_to: date | None = None
+    opening_cents: int | None = None
+    closing_cents: int | None = None
+    tx_count: int = 0
+    imported_at: str = ""
+
+
+@dataclass
+class BankTransaction:
+    """A line of a bank statement; negative amounts are money going out."""
+
+    booking_date: date
+    amount_cents: int
+    fingerprint: str
+    id: int | None = None
+    statement_id: int = 0
+    account_id: int | None = None
+    value_date: date | None = None
+    currency: str = "EUR"
+    counterparty_name: str = ""
+    counterparty_iban: str = ""
+    purpose: str = ""
+    booking_text: str = ""
+    reference: str = ""
+    status: BankTxStatus = BankTxStatus.NEW
+    supplier_id: int | None = None
+    invoice_ids: list[int] = field(default_factory=list)
+    confidence: float = 0.0
+    reasons: list[str] = field(default_factory=list)
+    payment_id: int | None = None
+    note: str = ""
     created_at: str = ""

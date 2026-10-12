@@ -6,6 +6,7 @@ from contextlib import AbstractContextManager
 
 from supplier_app.database.connection import Database
 from supplier_app.repositories.interfaces import Repositories
+from supplier_app.repositories.sqlite_bank import SqliteBankRepository
 from supplier_app.repositories.sqlite_documents import (
     SqliteCaseRepository,
     SqliteDocumentRepository,
@@ -45,6 +46,7 @@ class SqliteRepositories(Repositories):
         self.organization = SqliteOrganizationRepository(db)
         self.users = SqliteUserRepository(db)
         self.recurring = SqliteRecurringRepository(db)
+        self.bank = SqliteBankRepository(db)
 
     def transaction(self) -> AbstractContextManager[None]:
         return self.db.transaction()

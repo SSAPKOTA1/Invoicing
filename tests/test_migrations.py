@@ -111,3 +111,25 @@ def test_ledger_check_constraints(file_storage) -> None:
         db.execute(base, (pid, "REVERSAL", "INVOICE", -5))  # reversal needs reverses_entry_id
     with pytest.raises(sqlite3.IntegrityError):
         db.execute(base, (pid, "BOGUS", "INVOICE", 5))
+
+
+def test_new_tables_and_reference_types_after_upgrade(tmp_path: Path) -> None:
+    """Migration 6 rebuilds the reference table without losing rows; 7 and 8 add recurring invoices and bank data."""
+    db_path = tmp_path / "c.db"
+    assert migrate(db_path, tmp_path / "bk", target_version=5) == 5
+    con = sqlite3.connect(db_path)
+    con.execute("INSERT INTO document_references(owner_kind,owner_id,ref_type,raw_value,normalized_value,created_at)"
+                " VALUES ('invoice',1,'customer_number','K 1','K1','2024-01-01')")
+    con.commit()
+    con.close()
+    assert migrate(db_path, tmp_path / "bk") == LATEST_VERSION
+    t = tables(db_path)
+    for name in ("recurring_invoices", "recurring_amounts", "recurring_runs", "bank_accounts", "bank_statements",
+                 "bank_transactions"):
+        assert name in t
+    with Database(db_path) as db:
+        assert db.scalar("SELECT normalized_value FROM document_references") == "K1"
+        db.execute("INSERT INTO document_references(owner_kind,owner_id,ref_type,raw_value,normalized_value,created_at)"
+                   " VALUES ('invoice',1,'contract_number','V-7','V7','2024-01-01')")
+        cols = {r["name"] for r in db.query_all("PRAGMA table_info(documents)")}
+        assert {"assignment_pending", "pending_json"} <= cols

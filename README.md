@@ -63,7 +63,7 @@ Unter *Einstellungen → Pfade* öffnet ein Klick den Datenordner.
 | Strg+I | Dokumente importieren |
 | Strg+P | Zahlung erfassen |
 | Strg+N | neuer Lieferant |
-| Strg+1 … Strg+7 | Bereiche der Navigation |
+| Strg+1 … Strg+8 | Bereiche der Navigation |
 | Strg+T | Hell/Dunkel umschalten |
 | Strg+L | sperren (wenn PIN aktiv) |
 | F5 | aktualisieren |
@@ -88,6 +88,30 @@ Netto, MwSt und Brutto werden gegeneinander geprüft (Netto + MwSt = Brutto). Fe
 *Einstellungen → Darstellung → Sprache* (Deutsch oder English). Die Wahl gilt für diesen PC und wird beim nächsten Start wirksam (die Anwendung bietet den Neustart direkt an). Übersetzt sind alle Bildschirme, Dialoge, Fehlermeldungen, Hinweise der Dokumentenerkennung und die Überschriften der Berichte (CSV/Excel/PDF/Druck). Zum Ausprobieren: `SupplierApp.exe --language en`.
 
 Gleich bleiben: Zahlen- und Datumsformat (`1.234,56 €`, `31.12.2024`), Beispieldaten und die Texte der Dokumente selbst; die Erkennung versteht deutsche, englische, französische, italienische, spanische und niederländische Belege unabhängig von der Oberfläche. Buchungstexte werden in der Datenbank deutsch gespeichert und beim Anzeigen übersetzt, deshalb sehen Kollegen mit anderer Sprache dieselben Buchungen in ihrer Sprache.
+
+### Lieferant und Absender erkennen, korrigieren
+
+Im Prüfformular zeigt die Auswahl **Lieferant/Absender** zuerst die **Vorschläge** der Erkennung (★ mit Sicherheit in %), darunter *neu anlegen* und alle Stammdaten; **Suchen …** öffnet eine Suche über Name, Ort und IBAN. Unter der Auswahl steht, **warum** vorgeschlagen wird (IBAN, Name im Briefkopf/in der Absenderzeile/Fußzeile, USt-IdNr., Steuernummer, E-Mail-Domain, Inkassobüro → vertretener Lieferant, bekannte Referenz …). Eigene Gesellschaften und Hotels (und zusätzliche Namen unter *Einstellungen → Erkennung*) werden nie als Lieferant vorgeschlagen. Nach dem Buchen merkt sich die Anwendung IBAN, Namen und Anschrift, damit der nächste Beleg sicher erkannt wird.
+
+**Später ändern:** im Vorgang (Rechnungsverlauf) **Lieferant ändern …** – die Rechnung wird beim bisherigen Lieferanten storniert und beim neuen neu gebucht (nur solange es keine Zahlungen, Gutschriften oder Schreiben gibt; sonst erklärt die Anwendung, was zuerst storniert werden muss) – und bei einer markierten Mahnung **Absender ändern …** (Lieferant oder dessen Inkassobüro; die Buchungen bleiben unverändert). Alles wird protokolliert.
+
+**Referenzen** (Kundennummer, Vertragsnummer, Aktenzeichen, Schreibensnummer, Vorgangsnummer, Bestellnummer, Mandatsreferenz …) werden in den vier üblichen Anordnungen gelesen (inline, zwei nebeneinander, Wert darunter, Kopfzeile über Wertzeile); Daten, Beträge und Wörter ohne Ziffer gelten nicht als Referenz.
+
+### Dokumente ohne Rechnung
+
+Schreiben, Gutschriften und Zahlungsavise, zu denen die Rechnung noch fehlt, können trotzdem übernommen werden: Die Anwendung **warnt** („Keine Rechnung zugeordnet – trotzdem übernehmen?“), legt das Dokument beim Lieferanten ab und **bucht noch nichts**. Es erscheint im Bereich *Dokumente* unter dem Filter **Ohne Rechnung** und in der Übersicht unter „Dokumente ohne Rechnungszuordnung“ (mit Hinweis, wenn die Rechnung inzwischen erfasst wurde). Dokument öffnen → Rechnung wählen → **Zuordnen & buchen**.
+
+Im Prüfformular zeigt **Betroffene Rechnungen** je Rechnung eine Karte (Nummer, Datum, Brutto, offener Betrag laut Konto) mit allen geforderten Beträgen (Hauptforderung, Gebühren, Zinsen, Pauschale, sonstige Kosten, Gesamt) in gut lesbaren Feldern; Vorschläge der Erkennung erscheinen als Schaltflächen.
+
+### Wiederkehrende Rechnungen (Miete, Leasing …)
+
+*Lieferanten → Reiter **Wiederkehrend** → Neue wiederkehrende Rechnung*: Lieferant (z. B. die Hausverwaltung), Bezeichnung, Intervall (monatlich, vierteljährlich, halbjährlich, jährlich), Tag im Monat (31 = Monatsende), Beginn und optionales Ende, Zahlungsziel, MwSt-Satz, Gesellschaft/Hotel und die **Beträge mit Gültig-ab-Datum** (eine Mieterhöhung ist eine neue Zeile). Beim Start der Anwendung und danach stündlich bucht die Anwendung jede fällig gewordene Rechnung **automatisch** (Nummer nach Muster, z. B. `MIETE-2026-11`); ein Zeitraum wird nie doppelt erzeugt, eine schon vorhandene Rechnung mit derselben Nummer wird übernommen statt dupliziert. *Jetzt erzeugen* löst es von Hand aus, *Aktivieren / Pausieren* hält die Vorlage an; das Löschen der Vorlage lässt die erzeugten Rechnungen unberührt.
+
+### Bankauszüge
+
+*Bankauszüge* (Strg+5): Kontoauszug importieren (**CSV** der gängigen deutschen Banken, **CAMT.053 (XML)**, **MT940**, PDF mit Textebene als Notlösung) – per Schaltfläche oder Drag & Drop (auch auf *Dokumente*). Die Anwendung erkennt das **eigene Konto** an der IBAN (Konten unter *Bankkonten …* mit Zuordnung zu Gesellschaft/Hotel; fehlt die IBAN in der Datei, wird gefragt) und schlägt für jede Ausgangsbuchung **Lieferant und Rechnungen** vor – aus IBAN (auch früheren Zahlungen), Name, Rechnungsnummern und bekannten Referenzen im Verwendungszweck, passendem Betrag (auch Summe mehrerer Rechnungen) und wiederkehrenden Zahlungen. Eingänge und Umbuchungen zwischen eigenen Konten werden als *ignoriert* markiert.
+
+Pro Buchung sehen Sie, **warum** die Anwendung so entschieden hat, und können Lieferant und Rechnungen ändern, **später buchen**, **ignorieren** oder **buchen**; **Sichere Zuordnungen buchen** bucht nur die eindeutigen. Die Summe der gewählten Rechnungen wird dem Betrag gegenübergestellt; bei Abweichung, fehlender Rechnung (Guthaben) oder einer gleichen, schon gebuchten Zahlung wird vorher gefragt. Beim Buchen merkt sich die Anwendung IBAN und Namen des Zahlungsempfängers. Dieselbe Zeile wird nie zweimal importiert (auch bei sich überlappenden Auszügen oder demselben Auszug als CSV und CAMT); storniert man eine Zahlung, wartet die Buchung wieder auf eine Entscheidung. Die Übersicht zeigt, wie viele Buchungen noch zu prüfen sind.
 
 ### Berichte drucken
 

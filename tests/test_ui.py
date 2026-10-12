@@ -48,7 +48,7 @@ def win(demo_ctx):
 
 
 def test_every_screen_builds_in_both_themes_empty_and_filled(ctx, demo_ctx) -> None:
-    assert check_all_screens(demo_ctx) == 14
+    assert check_all_screens(demo_ctx) == 16
 
 
 def test_empty_database_screens_and_empty_state(ctx) -> None:
@@ -685,3 +685,112 @@ def test_recurring_invoice_dialog_tab_and_supplier_change(win, demo_ctx, monkeyp
     assert ctrl.generate_recurring() == 0  # nothing new
     chooser = PartyChangeDialog("t", "hint", svc.suppliers.suppliers(), landlord.id)
     assert chooser.party_id() == landlord.id
+
+
+def test_bank_page_import_review_and_booking(win, demo_ctx, monkeypatch) -> None:
+    from supplier_app.models.enums import BankTxStatus
+    from supplier_app.views.dialogs.bank_dialogs import AccountChooserDialog, BankAccountEditDialog, BankAccountsDialog
+    app, ctrl, window = win
+    svc = demo_ctx.services
+    page = window.pages["bank"]
+    window.show_page("bank")
+    fixtures = FIX / "bank"
+    page.import_files([fixtures / "sparkasse.csv"])
+    page.refresh()
+    assert page.table.row_count() >= 2 and "zu prüfen" in page.summary.text()
+    outgoing = [t for t in svc.bank.transactions() if t.amount_cents < 0]
+    assert outgoing
+    tx = outgoing[0]
+    page.status.setCurrentIndex(page.status.findData("all"))
+    page.table.select_payload(tx.id)
+    assert page.tx_id == tx.id and page.picker.combo.count() > 1
+    assert "IBAN" in page.facts.text()
+    page.save_later()
+    page.ignore()
+    assert svc.bank.get(tx.id).status == BankTxStatus.IGNORED
+    page.table.select_payload(tx.id)
+    page.reopen()
+    # supplier + invoice chosen by the user, then booked
+    supplier = svc.suppliers.suppliers()[0]
+    inv = next(i for i in svc.invoices.list(supplier.id) if svc.ledger.invoice_balance(i.id).balance_cents > 0)
+    svc.bank.assign(tx.id, supplier.id, [inv.id])
+    page.refresh()
+    page.table.select_payload(tx.id)
+    assert page.invoices.rowCount() >= 1 and page.btn_book.isEnabled()
+    page.book()
+    assert svc.bank.get(tx.id).status in (BankTxStatus.BOOKED, BankTxStatus.MATCHED)
+    page.book_sure()
+    # accounts
+    dlg = BankAccountsDialog(ctrl)
+    assert dlg.table.row_count() == 1
+    edit = BankAccountEditDialog(ctrl, svc.bank.accounts()[0])
+    edit.name.setText("Hauptkonto")
+    edit.accept()
+    assert svc.bank.accounts()[0].name == "Hauptkonto"
+    chooser = AccountChooserDialog(ctrl, "x.csv")
+    chooser.accept()
+    assert chooser.account_id == svc.bank.accounts()[0].id
+    monkeypatch.setattr("supplier_app.views.pages.bank.AccountChooserDialog", lambda *a, **k: type("D", (), {
+        "exec": lambda self: 0, "account_id": None})())
+    page.import_files([fixtures / "statement.sta"])
+    page.refresh()
+
+
+def test_party_picker_and_claims_editor(win, demo_ctx) -> None:
+    from supplier_app.ai.result_types import NewPartyInfo, PartyCandidate
+    from supplier_app.models.entities import Party
+    from supplier_app.services.review_models import ClaimInput
+    from supplier_app.views.widgets.claims_editor import ClaimsEditor
+    from supplier_app.views.widgets.party_picker import PartyChooserDialog, PartyPicker
+    app, ctrl, window = win
+    svc = demo_ctx.services
+    parties = svc.suppliers.suppliers()
+    picker = PartyPicker(parties)
+    cands = [PartyCandidate(parties[0].id, parties[0].name, 0.82, ["IBAN passt"]), PartyCandidate(parties[1].id, parties[1].name, 0.2)]
+    picker.set_candidates(cands, parties[0].id, suggested=True)
+    assert picker.party_id() == parties[0].id and "82" in picker.hint.text()
+    assert picker.combo.itemText(0).startswith("★") and picker.combo.findData(parties[1].id) >= 0
+    picker.set_candidates([], None, new_name="Neue GmbH", info=NewPartyInfo(address="Hauptstr. 1", vat_id="DE123456789"))
+    assert picker.party_id() is None and not picker.new_holder.isHidden() and "Hauptstr. 1" in picker.hint.text()
+    assert picker.name_for_new() == "Neue GmbH"
+    chooser = PartyChooserDialog(parties)
+    chooser.filter.setText(parties[2].name[:5])
+    assert chooser.list.count() >= 1
+    chooser.accept()
+    assert chooser.chosen_id is not None
+    # claims editor: cards for the invoices of the supplier, suggestions as buttons
+    inv = next(i for i in svc.invoices.list() if svc.ledger.invoice_balance(i.id).balance_cents > 0)
+    editor = ClaimsEditor(svc)
+    editor.set_supplier(inv.supplier_id)
+    editor.set_claims([], [])
+    assert not editor.empty.isHidden() and editor.claims() == []
+    editor.set_claims([ClaimInput(inv.id, principal_cents=1000, fees_cents=500, total_cents=1500)])
+    assert editor.empty.isHidden() and editor.claims()[0].invoice_id == inv.id and editor.claims()[0].total_cents == 1500
+    editor._remove(editor.cards[0])
+    assert editor.claims() == []
+    unknown = svc.suppliers.create(Party(name="Ohne Rechnungen AG"))
+    editor.set_supplier(unknown.id)
+    editor.add_claim(None)
+    assert editor.claims() == []  # a card without an invoice is not a claim
+
+
+def test_dashboard_shows_open_bank_transactions(win, demo_ctx, monkeypatch) -> None:
+    from supplier_app.services.dashboard_models import DashboardFilter
+    from supplier_app.services.dashboard_service import DashboardService
+    app, ctrl, window = win
+    svc = demo_ctx.services
+    svc.bank.import_file(FIX / "bank" / "sparkasse.csv")
+    ds = DashboardService(svc.repos, svc.ledger, svc.settings)
+    items = ds.build(DashboardFilter.for_period("year", date.today())).attention["bank"]
+    assert len(items) == 1 and items[0].target.kind == "bank"
+    seen = []
+    ctrl.navigate.connect(seen.append)
+    window.show_page("dashboard")
+    window.pages["dashboard"].refresh()
+    window.pages["dashboard"]._attention_clicked(items[0])
+    assert seen == ["bank"]
+    # a bank statement dropped on the documents page is routed to the bank page
+    routed = []
+    ctrl.bank_files.connect(routed.append)
+    window.pages["documents"].start_import([FIX / "bank" / "statement.camt.xml"])
+    assert routed and routed[0][0].name == "statement.camt.xml"

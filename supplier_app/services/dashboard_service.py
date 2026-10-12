@@ -272,6 +272,7 @@ class DashboardService(ServiceBase):
                           DrillTarget("docs", "review"), "document", d.id)
             for d in review_docs if d.review_status == ReviewStatus.NEEDS_REVIEW or d.confidence < low][:8]
         out["unassigned"] = self._unassigned_documents(flt)
+        out["bank"] = self._bank_open()
         out["duplicates"] = self._duplicates(states)
         credits = [
             AttentionItem(
@@ -285,6 +286,15 @@ class DashboardService(ServiceBase):
             for inv, bal in states if bal < 0 and inv.status != InvoiceStatus.CANCELLED]
         out["credits"] = credits[:8]
         return out
+
+    def _bank_open(self) -> list[AttentionItem]:
+        """Imported bank transactions that still wait for a decision (one summary line, opens the bank page)."""
+        counts = self.repos.bank.count_by_status()
+        waiting, matched = counts.get("new", 0) + counts.get("matched", 0), counts.get("matched", 0)
+        if not waiting:
+            return []
+        return [AttentionItem(tr("dash.attention.bank.item", n=waiting), tr("dash.attention.bank.sub", matched=matched),
+                              "warn", DrillTarget("bank", "open"), "page", None)]
 
     def _unassigned_documents(self, flt: DashboardFilter) -> list[AttentionItem]:
         """Accepted documents that still wait for an invoice; says whether a matching invoice has been entered since."""

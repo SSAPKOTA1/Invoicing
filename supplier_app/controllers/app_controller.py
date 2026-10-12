@@ -32,6 +32,7 @@ class AppController(QObject):
     open_invoice = Signal(int)
     open_supplier = Signal(int)
     open_document = Signal(int)
+    bank_files = Signal(list)  # statement files found among imported documents (list[Path])
     open_case = Signal(int)
     drill = Signal(object, object)  # DrillTarget, DashboardFilter
     focus_search = Signal()

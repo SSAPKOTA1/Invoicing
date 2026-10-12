@@ -31,6 +31,7 @@ from supplier_app.views.dialogs.payment_dialog import PaymentDialog
 from supplier_app.views.dialogs.pin_dialog import UnlockDialog
 from supplier_app.views.dialogs.supplier_dialog import SupplierDialog
 from supplier_app.views.icons import make_icon
+from supplier_app.views.pages.bank import BankPage
 from supplier_app.views.pages.base import Page
 from supplier_app.views.pages.cases import CasesPage
 from supplier_app.views.pages.dashboard import DashboardPage
@@ -42,7 +43,7 @@ from supplier_app.views.pages.transactions import TransactionsPage
 from supplier_app.views.search_popup import SearchPopup
 from supplier_app.views.theme import tokens
 
-PAGES = [DashboardPage, SuppliersPage, CasesPage, DocumentsPage, TransactionsPage, ReportsPage, SettingsPage]
+PAGES = [DashboardPage, SuppliersPage, CasesPage, DocumentsPage, BankPage, TransactionsPage, ReportsPage, SettingsPage]
 
 
 class MainWindow(QMainWindow):
@@ -202,6 +203,7 @@ class MainWindow(QMainWindow):
         c.open_invoice.connect(self.show_invoice)
         c.open_supplier.connect(self.show_supplier)
         c.open_document.connect(self.show_document)
+        c.bank_files.connect(self.import_bank_files)
         c.open_case.connect(self.show_case)
         c.drill.connect(self.show_drill)
         c.focus_search.connect(self.focus_search)
@@ -301,6 +303,10 @@ class MainWindow(QMainWindow):
     def start_import(self) -> None:
         self.show_page("documents")
         self.pages["documents"].choose_files()  # type: ignore[attr-defined]
+
+    def import_bank_files(self, files: list) -> None:
+        self.show_page("bank")
+        self.pages["bank"].import_files(files)  # type: ignore[attr-defined]
 
     def new_payment(self, _arg=None) -> None:
         PaymentDialog(self.ctrl, parent=self).exec()

@@ -451,3 +451,58 @@ EN.update({
     "Die wiederkehrende Rechnung ist ungültig oder doppelt (Beträge mit gleichem Datum?).":
         "The recurring invoice is invalid or duplicated (amounts with the same date?).",
 })
+
+EN.update({
+    "Aus dem Kontoauszug ist das Bankkonto nicht ersichtlich. Bitte das Konto auswählen.":
+        "The statement does not show which bank account it belongs to. Please choose the account.",
+    "Bitte einen Namen für das Konto angeben.": "Please enter a name for the account.",
+    "Der Kontoauszug enthält keine Buchungen.": "The statement contains no transactions.",
+    "Dieser Kontoauszug wurde bereits importiert.": "This statement has already been imported.",
+    "Diese Buchung ist bereits als Zahlung gebucht. Bitte zuerst die Zahlung stornieren.":
+        "This transaction is already booked as a payment. Please reverse the payment first.",
+    "Eingänge können nicht als Zahlung an einen Lieferanten gebucht werden.":
+        "Incoming money cannot be booked as a payment to a supplier.",
+    "Bitte zuerst den Lieferanten wählen.": "Please choose the supplier first.",
+    "Zu dieser Buchung gibt es bereits eine gleiche Zahlung. Bitte prüfen, ob sie schon gebucht ist.":
+        "An identical payment already exists for this transaction. Please check whether it has been booked already.",
+    "Bankkonto nicht gefunden.": "Bank account not found.",
+    "Der Kontoauszug gehört zum Konto {iban}, nicht zu '{name}' ({other}).":
+        "The statement belongs to the account {iban}, not to '{name}' ({other}).",
+    "Zu diesem Konto gibt es importierte Kontoauszüge und es kann nicht gelöscht werden.":
+        "Statements have been imported for this account, so it cannot be deleted.",
+    "Dieses Bankkonto existiert bereits oder ist ungültig.": "This bank account already exists or is invalid.",
+    "Diese Buchung wurde bereits importiert.": "This transaction has already been imported.",
+    "Die CSV-Datei hat keine erkennbaren Spalten für Datum und Betrag.": "The CSV file has no recognisable columns for date and amount.",
+    "Die XML-Datei enthält keinen Kontoauszug (CAMT.053).": "The XML file contains no statement (CAMT.053).",
+    "Die Datei enthält keine Buchungen (MT940).": "The file contains no transactions (MT940).",
+    "Im PDF wurden keine Buchungszeilen erkannt. Bitte besser CSV, CAMT oder MT940 exportieren.":
+        "No transaction lines were recognised in the PDF. Please export CSV, CAMT or MT940 instead.",
+    "Die Datei '{name}' ist zu groß.": "The file '{name}' is too large.",
+    "Die XML-Datei ist kein gültiger Kontoauszug (CAMT).": "The XML file is not a valid statement (CAMT).",
+    "PDF-Kontoauszüge können hier nicht gelesen werden.": "PDF statements cannot be read here.",
+    # notes, reasons and warnings of the recognition
+    "Eingang": "incoming",
+    "Umbuchung auf {name}": "transfer to {name}",
+    "Umbuchung zwischen eigenen Konten": "transfer between own accounts",
+    "Zahlung wohl schon gebucht": "payment probably booked already",
+    "Zahlung storniert": "payment reversed",
+    "gleiche Zahlung ist bereits gebucht": "an identical payment is already booked",
+    "vom Benutzer zugeordnet": "assigned by the user",
+    "IBAN {iban} gehört zum Lieferanten": "IBAN {iban} belongs to the supplier",
+    "frühere Zahlung an diese IBAN": "earlier payment to this IBAN",
+    "Name „{name}“ ähnlich zu „{party}“ ({pct} %)": "name “{name}” resembles “{party}” ({pct} %)",
+    "Name „{name}“ im Verwendungszweck": "name “{name}” in the payment reference",
+    "Rechnungsnummer {number} im Verwendungszweck": "invoice number {number} in the payment reference",
+    "Referenz {ref} ist bekannt": "reference {ref} is known",
+    "Betrag {amount} entspricht der offenen Rechnung {number}": "amount {amount} equals the open invoice {number}",
+    "wiederkehrende Zahlung „{title}“": "recurring payment “{title}”",
+    "Rechnung {numbers} im Verwendungszweck, Betrag stimmt": "invoice {numbers} in the payment reference, amount matches",
+    "Rechnung {numbers} im Verwendungszweck, Betrag weicht ab ({amount} statt {expected})":
+        "invoice {numbers} in the payment reference, amount differs ({amount} instead of {expected})",
+    "Betrag entspricht der offenen Rechnung {number}": "amount equals the open invoice {number}",
+    "Summe von {n} offenen Rechnungen": "sum of {n} open invoices",
+    "{n} Zeilen ohne Datum oder Betrag wurden übersprungen.": "{n} lines without date or amount were skipped.",
+    "PDF-Kontoauszug: bitte die erkannten Buchungen sorgfältig prüfen.": "PDF statement: please check the recognised transactions carefully.",
+    "Zeile nicht lesbar: {text}": "Line not readable: {text}",
+    "Datum nicht lesbar: {text}": "Date not readable: {text}",
+})

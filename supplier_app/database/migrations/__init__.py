@@ -12,6 +12,7 @@ from . import (
     m005_users_sync,
     m006_refs_assignment,
     m007_recurring,
+    m008_bank,
 )
 
 
@@ -26,6 +27,6 @@ class Migration:
 ALL_MIGRATIONS: list[Migration] = [
     Migration(m.VERSION, m.NAME, m.SQL, tuple(getattr(m, "PG_EXTRA", ())))
     for m in (m001_core, m002_references_search, m003_reporting_indexes, m004_companies_hotels, m005_users_sync,
-              m006_refs_assignment, m007_recurring)
+              m006_refs_assignment, m007_recurring, m008_bank)
 ]
 LATEST_VERSION: int = ALL_MIGRATIONS[-1].version

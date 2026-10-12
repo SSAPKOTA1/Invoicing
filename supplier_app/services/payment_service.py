@@ -211,6 +211,7 @@ class PaymentService(ServiceBase):
             for (invoice_id, component), total in sums.items():
                 if total != 0:
                     self.repos.payments.add_allocation(PaymentAllocation(payment_id, invoice_id, component, -total))
+            self.repos.bank.release_payment(payment_id)  # a bank transaction booked as this payment waits again
             self._audit("reverse", "payment", payment_id, reason)
             for invoice_id in {i for (i, _c) in sums}:
                 self.ledger.refresh_status(invoice_id)

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from supplier_app.backup.service import BackupService
 from supplier_app.bootstrap import Storage
 from supplier_app.repositories.interfaces import Repositories
+from supplier_app.services.bank_service import BankService
 from supplier_app.services.case_service import CaseService
 from supplier_app.services.document_service import DocumentService
 from supplier_app.services.dunning_service import DunningService
@@ -44,6 +45,7 @@ class Services:
     ingest: IngestService
     organization: OrganizationService
     recurring: RecurringService
+    bank: BankService
     users: UserService
     session: Session
 
@@ -63,7 +65,8 @@ def build_services(storage: Storage, *, multi_user: bool = False, prefs: LocalPr
     if files_in_database is None:
         files_in_database = multi_user and storage.db.backend == "postgres"  # shared folder mode keeps the files in the folder
     documents = DocumentService(repos, storage.paths, files_in_database=files_in_database)
-    ingest = IngestService(repos, documents, make_text_extractor(settings), settings, ledger, suppliers, invoices,
+    extractor = make_text_extractor(settings)
+    ingest = IngestService(repos, documents, extractor, settings, ledger, suppliers, invoices,
                            payments, dunning)
     return Services(
         repos=repos,
@@ -82,6 +85,7 @@ def build_services(storage: Storage, *, multi_user: bool = False, prefs: LocalPr
         ingest=ingest,
         organization=OrganizationService(repos),
         recurring=RecurringService(repos, invoices),
+        bank=BankService(repos, ledger, payments, pdf_text=lambda p: extractor.extract(p).text),
         users=UserService(repos, session),
         session=session,
     )

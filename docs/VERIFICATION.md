@@ -36,6 +36,9 @@ CI target: GitHub Actions `windows-latest`, Python 3.11 (see the CI section at t
 
 * English interface: `en.json` is complete (same keys and placeholders as `de.json`); every screen, dialog, review panel, drill-down, report and invoice history is opened in English with demo data and checked for German function words; every error message of the source code has an English text; saving/restoring the language, the settings selector with restart, the `--language` option and the English report headings are tested (`tests/test_i18n.py`, `tests/test_english.py`).
 
+* Recognition quality (change request "refine the identifier"): a generated corpus of 72 letters (invoices, reminders, agency letters, new and known suppliers, five reference layouts, OCR noise, look-alike names, own company names) is evaluated by `tests/recognition_corpus.py`; results: known supplier 100 % (clean) / 98 % (noisy, look-alike master data), new supplier name 100 %, references 100 % with 100 % precision (before: references 1/3 missed, the unknown agency letters matched to the wrong supplier). `tests/test_recognition_accuracy.py` fails below the thresholds in DECISIONS 37.
+* Documents without invoice, changing the supplier/sender later, recurring invoices, bank statements: `tests/test_unassigned.py`, `tests/test_corrections.py`, `tests/test_recurring.py`, `tests/test_bank_parsers.py` (CSV incl. cp1252/preamble/debit-credit columns, CAMT.053, MT940 structured and SEPA tags, PDF text), `tests/test_bank.py` (matching, booking, learning, duplicates, overlapping statements, own-account transfers, reversal), UI tests for the picker, the claims editor, the bank page and the recurring dialog; the whole suite also runs on PostgreSQL 16.
+
 ## Known limitations
 
 * The Windows `.exe` was not run on Windows by me; Windows behaviour is covered by the CI workflow only.

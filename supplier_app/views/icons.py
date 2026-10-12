@@ -40,6 +40,15 @@ def _draw(name: str, p: QPainter, color: QColor) -> None:
         p.drawPath(path)
         for y in (30, 40, 50):
             p.drawLine(QPointF(22, y), QPointF(42, y))
+    elif name == "bank":
+        path = QPainterPath(QPointF(8, 24))
+        path.lineTo(32, 8)
+        path.lineTo(56, 24)
+        path.closeSubpath()
+        p.drawPath(path)
+        for x in (16, 28, 40):
+            p.drawLine(QPointF(x + 2, 30), QPointF(x + 2, 46))
+        p.drawLine(QPointF(8, 54), QPointF(56, 54))
     elif name == "transactions":
         for y in (16, 32, 48):
             p.drawLine(QPointF(8, y), QPointF(14, y))

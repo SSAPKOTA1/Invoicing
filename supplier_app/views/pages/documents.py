@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from supplier_app.bank.parsers import looks_like_bank_file
 from supplier_app.controllers.app_controller import AppController
 from supplier_app.controllers.import_controller import ImportController
 from supplier_app.i18n import tr
@@ -212,6 +213,12 @@ class DocumentsPage(Page):
         if self.importer.busy:
             info(self, tr("docs.busy"))
             return
+        statements = [f for f in files if f.suffix.lower() != ".pdf" and looks_like_bank_file(f)]
+        if statements:  # bank statements are not documents: they go to the bank page
+            files = [f for f in files if f not in statements]
+            self.ctrl.bank_files.emit(statements)
+            if not files:
+                return
         self.import_msgs.setVisible(False)
         self.progress.setVisible(True)
         self.progress.setRange(0, len(files))

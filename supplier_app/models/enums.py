@@ -26,6 +26,15 @@ class RecurrencePeriod(str, Enum):
         return {"monthly": 1, "quarterly": 3, "half_yearly": 6, "yearly": 12}[self.value]
 
 
+class BankTxStatus(str, Enum):
+    """State of an imported bank transaction: to check, matched (proposal), booked as payment, or ignored."""
+
+    NEW = "new"
+    MATCHED = "matched"
+    BOOKED = "booked"
+    IGNORED = "ignored"
+
+
 class PartyRole(str, Enum):
     SUPPLIER = "supplier"
     COLLECTION_AGENCY = "collection_agency"

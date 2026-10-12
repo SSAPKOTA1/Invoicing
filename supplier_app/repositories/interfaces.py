@@ -9,6 +9,9 @@ from typing import Any
 from supplier_app.models.entities import (
     AppUser,
     AuditLogEntry,
+    BankAccount,
+    BankStatement,
+    BankTransaction,
     Case,
     CaseEvent,
     Category,
@@ -25,7 +28,7 @@ from supplier_app.models.entities import (
     PaymentAllocation,
     RecurringInvoice,
 )
-from supplier_app.models.enums import InvoiceStatus, PartyRole, ReviewStatus
+from supplier_app.models.enums import BankTxStatus, InvoiceStatus, PartyRole, ReviewStatus
 from supplier_app.models.scope import Scope
 
 
@@ -335,6 +338,49 @@ class RecurringRepository(ABC):
     def template_of_invoice(self, invoice_id: int) -> int | None: ...
 
 
+class BankRepository(ABC):
+    @abstractmethod
+    def add_account(self, account: BankAccount) -> BankAccount: ...
+    @abstractmethod
+    def update_account(self, account: BankAccount) -> None: ...
+    @abstractmethod
+    def get_account(self, account_id: int) -> BankAccount | None: ...
+    @abstractmethod
+    def account_by_iban(self, iban: str) -> BankAccount | None: ...
+    @abstractmethod
+    def accounts(self) -> list[BankAccount]: ...
+    @abstractmethod
+    def delete_account(self, account_id: int) -> None: ...
+    @abstractmethod
+    def add_statement(self, statement: BankStatement) -> BankStatement: ...
+    @abstractmethod
+    def update_statement(self, statement: BankStatement) -> None: ...
+    @abstractmethod
+    def statement_by_hash(self, file_hash: str) -> BankStatement | None: ...
+    @abstractmethod
+    def statements(self) -> list[BankStatement]: ...
+    @abstractmethod
+    def add_transaction(self, tx: BankTransaction) -> BankTransaction: ...
+    @abstractmethod
+    def update_transaction(self, tx: BankTransaction) -> None: ...
+    @abstractmethod
+    def get_transaction(self, tx_id: int) -> BankTransaction | None: ...
+    @abstractmethod
+    def existing_fingerprints(self, fingerprints: list[str]) -> set[str]: ...
+    @abstractmethod
+    def transactions(
+        self, *, status: BankTxStatus | None = None, account_id: int | None = None, statement_id: int | None = None,
+        supplier_id: int | None = None,
+    ) -> list[BankTransaction]: ...
+    @abstractmethod
+    def count_by_status(self) -> dict[str, int]: ...
+    @abstractmethod
+    def by_payment(self, payment_id: int) -> BankTransaction | None: ...
+    @abstractmethod
+    def release_payment(self, payment_id: int) -> None:
+        """The payment was reversed: the transaction waits for a new decision."""
+
+
 class Repositories(ABC):
     """Bundle of all repositories plus the transaction scope."""
 
@@ -353,6 +399,7 @@ class Repositories(ABC):
     organization: OrganizationRepository
     users: UserRepository
     recurring: RecurringRepository
+    bank: BankRepository
 
     @abstractmethod
     def transaction(self) -> Any:
