@@ -206,6 +206,9 @@ class SqliteCaseRepository(SqliteRepo, CaseRepository):
             (case.title, case.status.value, case.notes, closed, case.id),
         )
 
+    def set_supplier(self, case_id: int, supplier_id: int) -> None:
+        self.db.execute("UPDATE cases SET supplier_id=? WHERE id=?", (supplier_id, case_id))
+
     def list(
         self, *, supplier_id: int | None = None, status: str | None = None, scope: Scope | None = None
     ) -> list[Case]:

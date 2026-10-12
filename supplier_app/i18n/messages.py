@@ -419,3 +419,18 @@ EN.update({
     "Dokument ohne Rechnung abgelegt": "Document filed without invoice",
     "Zuordnung der Rechnung": "Invoice assigned",
 })
+
+EN.update({
+    "Eine stornierte Rechnung kann nicht umgebucht werden.": "A cancelled invoice cannot be rebooked.",
+    "Die Rechnung hat bereits Zahlungen oder weitere Buchungen. Bitte zuerst diese stornieren, dann kann der Lieferant geändert werden.":
+        "The invoice already has payments or further postings. Please reverse them first, then the supplier can be changed.",
+    "Zur Rechnung gibt es Mahnungen oder Schreiben. Der Lieferant kann nicht mehr geändert werden.":
+        "There are reminders or letters for this invoice. The supplier can no longer be changed.",
+    "Der Lieferant '{name}' hat bereits eine Rechnung mit der Nummer '{number}'.":
+        "The supplier '{name}' already has an invoice with the number '{number}'.",
+    "Lieferant geändert: {old} → {new}": "Supplier changed: {old} → {new}",
+    "Das Inkassobüro '{name}' vertritt einen anderen Lieferanten als den des Schreibens. Bitte im Stammdatensatz 'vertritt Lieferant' prüfen.":
+        "The collection agency '{name}' represents a different supplier than the one of the letter. Please check 'represents supplier' in its master data.",
+    "Das Schreiben gehört zum Lieferanten '{name}'. Als Absender kommen dieser Lieferant oder ein von ihm beauftragtes Inkassobüro in Frage.":
+        "The letter belongs to the supplier '{name}'. Its sender can be this supplier or a collection agency it has appointed.",
+})

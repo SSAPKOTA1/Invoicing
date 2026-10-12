@@ -70,6 +70,12 @@ class SqliteInvoiceRepository(SqliteRepo, InvoiceRepository):
             ) from exc
         return invoice
 
+    def set_supplier(self, invoice_id: int, supplier_id: int) -> None:
+        try:
+            self.db.execute("UPDATE invoices SET supplier_id=? WHERE id=?", (supplier_id, invoice_id))
+        except INTEGRITY_ERRORS as exc:
+            raise DuplicateError("Rechnungsnummer ist bereits vergeben oder ungültig.") from exc
+
     def update(self, invoice: Invoice) -> None:
         if invoice.id is None:
             raise NotFoundError("Rechnung ohne ID.")

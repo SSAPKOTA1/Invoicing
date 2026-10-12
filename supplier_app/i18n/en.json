@@ -575,5 +575,13 @@
  "docs.status.unassigned": "Invoice missing",
  "dash.attention.unassigned": "Documents without invoice assignment",
  "dash.attention.unassigned.found": "Possible invoice: {number} ({pct} %)",
- "dash.attention.unassigned.none": "Invoice not recorded yet"
+ "dash.attention.unassigned.none": "Invoice not recorded yet",
+ "history.change_supplier": "Change supplier …",
+ "history.change_sender": "Change sender …",
+ "history.supplier_changed": "Supplier changed. The invoice has been rebooked.",
+ "history.sender_changed": "Sender changed.",
+ "party.change.supplier.title": "Change supplier",
+ "party.change.sender.title": "Change sender",
+ "party.change.supplier.hint": "Choose the correct supplier. The posting is reversed under the previous supplier and booked again under the new one. This is only possible while the invoice has no payments, credit notes or letters.",
+ "party.change.sender.hint": "Who wrote this letter? You can choose the supplier or one of its collection agencies. The postings stay unchanged."
 }

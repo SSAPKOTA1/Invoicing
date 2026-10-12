@@ -38,6 +38,18 @@ class DocumentService(ServiceBase):
         #: multi-user mode: the files live in the database, the documents folder is only a local cache
         self.files_in_database = files_in_database
 
+    def set_supplier(self, doc_id: int, supplier_id: int | None) -> Document:
+        """Correct the supplier a document is filed under (the booked ledger is not touched)."""
+        doc = self.repos.documents.get(doc_id)
+        if doc is None:
+            raise DocumentError("Dokument nicht gefunden.")
+        if supplier_id is not None and self.repos.parties.get(supplier_id) is None:
+            raise DocumentError("Lieferant nicht gefunden.")
+        doc.supplier_id = supplier_id
+        self.repos.documents.update(doc)
+        self._audit("change_supplier", "document", doc_id)
+        return doc
+
     def store_file(self, source: Path) -> tuple[Document, bool]:
         """Copy ``source`` into the documents folder. Returns ``(document, created)``.
 

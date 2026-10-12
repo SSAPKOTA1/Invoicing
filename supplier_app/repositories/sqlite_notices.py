@@ -100,6 +100,9 @@ class SqliteNoticeRepository(SqliteRepo, NoticeRepository):
     def set_deadline(self, notice_id: int, deadline: date | None) -> None:
         self.db.execute("UPDATE dunning_notices SET new_deadline=? WHERE id=?", (d2s(deadline), notice_id))
 
+    def set_sender(self, notice_id: int, sender_party_id: int) -> None:
+        self.db.execute("UPDATE dunning_notices SET sender_party_id=? WHERE id=?", (sender_party_id, notice_id))
+
     def set_case(self, notice_id: int, case_id: int | None) -> None:
         self.db.execute("UPDATE dunning_notices SET case_id=? WHERE id=?", (case_id, notice_id))
 

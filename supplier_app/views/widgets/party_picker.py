@@ -199,3 +199,22 @@ class PartyPicker(QWidget):
         self.new_name.setProperty("lowConfidence", bool(low))
         repolish(self.combo)
         repolish(self.new_name)
+
+
+class PartyChangeDialog(QDialog):
+    """Pick another existing party (supplier or sender) for something already booked."""
+
+    def __init__(self, title: str, hint: str, parties: list[Party], selected: int | None, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+        self.setMinimumWidth(520)
+        root = dialog_root(self)
+        root.addWidget(wrapped_label(hint, "Muted", 3))
+        self.picker = PartyPicker(parties, allow_new=False)
+        self.picker.set_candidates([], selected)
+        root.addWidget(self.picker)
+        root.addWidget(button_box(self))
+
+    def party_id(self) -> int | None:
+        return self.picker.party_id()

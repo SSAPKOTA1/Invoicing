@@ -14,6 +14,7 @@ from supplier_app.models.enums import (
     DunningLevel,
     InvoiceStatus,
     LedgerEntryType,
+    ReferenceType,
     ReviewStatus,
 )
 from supplier_app.models.scope import Scope
@@ -270,6 +271,7 @@ class DashboardService(ServiceBase):
             AttentionItem(d.original_name, f"{int(d.confidence * 100)} % Sicherheit", "warn",
                           DrillTarget("docs", "review"), "document", d.id)
             for d in review_docs if d.review_status == ReviewStatus.NEEDS_REVIEW or d.confidence < low][:8]
+        out["unassigned"] = self._unassigned_documents(flt)
         out["duplicates"] = self._duplicates(states)
         credits = [
             AttentionItem(
@@ -283,6 +285,27 @@ class DashboardService(ServiceBase):
             for inv, bal in states if bal < 0 and inv.status != InvoiceStatus.CANCELLED]
         out["credits"] = credits[:8]
         return out
+
+    def _unassigned_documents(self, flt: DashboardFilter) -> list[AttentionItem]:
+        """Accepted documents that still wait for an invoice; says whether a matching invoice has been entered since."""
+        from supplier_app.services.review_models import ReviewData  # local import: avoids a cycle at load
+        out: list[AttentionItem] = []
+        for d in self.repos.documents.list(scope=flt.scope, assignment_pending=True):
+            hint = tr("dash.attention.unassigned.none")
+            try:
+                review = ReviewData.from_json(d.pending_json)
+            except (ValueError, KeyError, TypeError):
+                review = None
+            if review is not None and d.supplier_id:
+                for ref_type, value in review.references:
+                    if ref_type != ReferenceType.INVOICE_NUMBER:
+                        continue
+                    inv = self.repos.invoices.get_by_number(d.supplier_id, value)
+                    if inv is not None:
+                        hint = tr("dash.attention.unassigned.found", number=inv.invoice_number, pct=90)
+                        break
+            out.append(AttentionItem(d.original_name, hint, "warn", DrillTarget("docs", "unassigned"), "document", d.id))
+        return out[:8]
 
     def _unapplied(self, flt: DashboardFilter) -> list:
         from supplier_app.services.payment_service import UnappliedPayment  # local import: avoids a cycle at load
@@ -375,6 +398,11 @@ class DashboardService(ServiceBase):
             return DrillResult(tr(f"dash.kpi.{'escalated_cases' if param == 'escalated' else 'open_cases'}"),
                                ["Vorgang", "Status", "Lieferant"], rows, None, len(rows))
         if kind == "docs":
+            if param == "unassigned":
+                docs = self.repos.documents.list(scope=flt.scope, assignment_pending=True)
+                rows = [DrillRow([d.original_name, tr(f"doctype.{d.doc_type.value}"), f"{int(d.confidence * 100)} %",
+                                  tr("docs.filter.unassigned")], 0, "document", d.id) for d in docs]
+                return DrillResult(tr("dash.attention.unassigned"), ["Dokument", "Typ", "Sicherheit", "Status"], rows, None, len(rows))
             docs = self._review_documents(flt)
             rows = [DrillRow([d.original_name, tr(f"doctype.{d.doc_type.value}"), f"{int(d.confidence * 100)} %",
                               tr(f"review.{d.review_status.value}")], 0, "document", d.id) for d in docs]

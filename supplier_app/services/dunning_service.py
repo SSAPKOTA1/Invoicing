@@ -216,6 +216,31 @@ class DunningService(ServiceBase):
         notice.new_deadline = deadline
         return notice
 
+    @atomic
+    def change_sender(self, notice_id: int, sender_party_id: int) -> DunningNotice:
+        """Correct who wrote a letter (supplier or one of its collection agencies); the ledger is not touched."""
+        notice = self.get(notice_id)
+        if sender_party_id == notice.sender_party_id:
+            return notice
+        sender = self.repos.parties.get(sender_party_id)
+        if sender is None:
+            raise NotFoundError("Absender nicht gefunden.")
+        if sender.role == PartyRole.COLLECTION_AGENCY:
+            if sender.represents_supplier_id != notice.supplier_id:
+                raise ValidationError(
+                    f"Das Inkassobüro '{sender.name}' vertritt einen anderen Lieferanten als den des Schreibens. "
+                    "Bitte im Stammdatensatz 'vertritt Lieferant' prüfen.")
+        elif sender_party_id != notice.supplier_id:
+            raise ValidationError(
+                f"Das Schreiben gehört zum Lieferanten '{self._name(notice.supplier_id)}'. "
+                "Als Absender kommen dieser Lieferant oder ein von ihm beauftragtes Inkassobüro in Frage.")
+        old = self._name(notice.sender_party_id)
+        with self.repos.transaction():
+            self.repos.notices.set_sender(notice_id, sender_party_id)
+            self._audit("change_sender", "notice", notice_id, f"{old} -> {sender.name}")
+        notice.sender_party_id = sender_party_id
+        return notice
+
     def reconcile(self, notice_id: int) -> NoticeReconciliation:
         return self.ledger.reconcile_notice(notice_id)
 

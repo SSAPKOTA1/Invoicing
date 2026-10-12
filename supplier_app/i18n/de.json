@@ -575,5 +575,13 @@
  "docs.status.unassigned": "Rechnung fehlt",
  "dash.attention.unassigned": "Dokumente ohne Rechnungszuordnung",
  "dash.attention.unassigned.found": "Mögliche Rechnung: {number} ({pct} %)",
- "dash.attention.unassigned.none": "Rechnung noch nicht erfasst"
+ "dash.attention.unassigned.none": "Rechnung noch nicht erfasst",
+ "history.change_supplier": "Lieferant ändern …",
+ "history.change_sender": "Absender ändern …",
+ "history.supplier_changed": "Lieferant geändert. Die Rechnung wurde umgebucht.",
+ "history.sender_changed": "Absender geändert.",
+ "party.change.supplier.title": "Lieferant ändern",
+ "party.change.sender.title": "Absender ändern",
+ "party.change.supplier.hint": "Wählen Sie den richtigen Lieferanten. Die Buchung wird beim bisherigen Lieferanten storniert und beim neuen neu gebucht. Das geht nur, solange es keine Zahlungen, Gutschriften oder Schreiben zur Rechnung gibt.",
+ "party.change.sender.hint": "Wer hat dieses Schreiben verfasst? Zur Auswahl stehen der Lieferant und seine Inkassobüros. Die Buchungen bleiben unverändert."
 }

@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 
 from supplier_app.controllers.app_controller import AppController
 from supplier_app.i18n import tr
-from supplier_app.models.enums import CaseStatus, InvoiceStatus, LedgerEntryType
+from supplier_app.models.enums import CaseStatus, InvoiceStatus, LedgerEntryType, PartyRole
 from supplier_app.services.history_service import HistoryItem, InvoiceHistory
 from supplier_app.util.dates import format_date
 from supplier_app.util.money import format_cents
@@ -30,6 +30,7 @@ from supplier_app.views.errors import confirm
 from supplier_app.views.widgets.common import Badge, Card, button, status_tone
 from supplier_app.views.widgets.data_table import Cell, DataTable, Row
 from supplier_app.views.widgets.document_preview import DocumentPreview
+from supplier_app.views.widgets.party_picker import PartyChangeDialog
 
 
 class StatBox(QFrame):
@@ -110,6 +111,8 @@ class InvoiceHistoryWidget(QWidget):
             (("due", tr("history.change_due"), self._change_due, ""), ("deadline", tr("history.change_deadline"), self._change_deadline, ""),
              ("scope", tr("history.change_scope"), self._change_scope, ""), ("dispute", tr("history.dispute"), self._dispute, ""),
              ("cancel", tr("history.cancel"), self._cancel, "danger")),
+            (("supplier", tr("history.change_supplier"), self._change_supplier, ""),
+             ("sender", tr("history.change_sender"), self._change_sender, "")),
         )
         for group in rows:
             actions = QHBoxLayout()
@@ -192,7 +195,7 @@ class InvoiceHistoryWidget(QWidget):
             self.warning_box.addWidget(lab)
         self._fill_table(h)
         cancelled = bal.status == InvoiceStatus.CANCELLED
-        for key in ("pay", "notice", "credit", "adjust", "writeoff", "dispute", "due", "scope"):
+        for key in ("pay", "notice", "credit", "adjust", "writeoff", "dispute", "due", "scope", "supplier"):
             self.actions[key].setEnabled(not cancelled)  # type: ignore[attr-defined]
         self.actions["cancel"].setEnabled(not cancelled)  # type: ignore[attr-defined]
         self.actions["dispute"].setText(  # type: ignore[attr-defined]
@@ -201,6 +204,7 @@ class InvoiceHistoryWidget(QWidget):
         self.compare_table.set_data([], [])
         self.preview.clear()
         self.actions["deadline"].setEnabled(False)  # type: ignore[attr-defined]
+        self.actions["sender"].setEnabled(False)  # type: ignore[attr-defined]
 
     def _load_case(self, h: InvoiceHistory) -> None:
         has_case = h.case is not None
@@ -242,6 +246,7 @@ class InvoiceHistoryWidget(QWidget):
         svc = self.ctrl.ctx.services
         self.compare_table.set_data([], [])
         self.actions["deadline"].setEnabled(item.kind == "notice" and bool(item.notice_id))  # type: ignore[attr-defined]
+        self.actions["sender"].setEnabled(item.kind == "notice" and bool(item.notice_id))  # type: ignore[attr-defined]
         if item.kind == "notice" and item.notice_id:
             rows = svc.dunning.compare_with_calculation(item.notice_id)
             self.compare_table.set_data(
@@ -330,6 +335,30 @@ class InvoiceHistoryWidget(QWidget):
             company_id, hotel_id = dlg.values()
             self.ctrl.run(self.ctrl.ctx.services.invoices.assign_scope, self.invoice_id, company_id, hotel_id,
                           parent=self, success=tr("history.scope_changed"))
+
+    def _change_supplier(self) -> None:
+        if not self.history or not self.invoice_id:
+            return
+        svc = self.ctrl.ctx.services
+        dlg = PartyChangeDialog(tr("party.change.supplier.title"), tr("party.change.supplier.hint"), svc.suppliers.suppliers(),
+                                self.history.invoice.supplier_id, self)
+        if dlg.exec() and dlg.party_id() is not None:
+            self.ctrl.run(svc.invoices.change_supplier, self.invoice_id, dlg.party_id(), parent=self,
+                          success=tr("history.supplier_changed"))
+
+    def _change_sender(self) -> None:
+        item = self.table.selected_payload()
+        if not isinstance(item, HistoryItem) or item.kind != "notice" or not item.notice_id:
+            return
+        svc = self.ctrl.ctx.services
+        notice = svc.dunning.get(item.notice_id)
+        parties = [p for p in svc.suppliers.list()
+                   if p.id == notice.supplier_id or (p.role == PartyRole.COLLECTION_AGENCY and p.represents_supplier_id == notice.supplier_id)]
+        dlg = PartyChangeDialog(tr("party.change.sender.title"), tr("party.change.sender.hint"), parties,
+                                notice.sender_party_id, self)
+        if dlg.exec() and dlg.party_id() is not None:
+            self.ctrl.run(svc.dunning.change_sender, item.notice_id, dlg.party_id(), parent=self,
+                          success=tr("history.sender_changed"))
 
     def _change_deadline(self) -> None:
         item = self.table.selected_payload()

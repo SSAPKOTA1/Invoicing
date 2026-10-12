@@ -35,7 +35,7 @@ from supplier_app.views.widgets.document_preview import DocumentPreview
 from supplier_app.views.widgets.drop_zone import DropZone
 from supplier_app.views.widgets.review_panel import ReviewPanel
 
-FILTERS = ["all", "review", "accepted", "rejected"]
+FILTERS = ["all", "review", "unassigned", "accepted", "rejected"]
 FILE_FILTER = "Dokumente (*.pdf *.png *.jpg *.jpeg *.tif *.tiff *.bmp *.txt);;Alle Dateien (*)"
 
 
@@ -117,19 +117,21 @@ class DocumentsPage(Page):
         docs = self.svc.repos.documents.list(scope=self.ctrl.scope)
         if mode == "review":
             docs = [d for d in docs if d.review_status in (ReviewStatus.PENDING, ReviewStatus.NEEDS_REVIEW)]
+        elif mode == "unassigned":
+            docs = [d for d in docs if d.assignment_pending]
         elif mode == "accepted":
-            docs = [d for d in docs if d.review_status == ReviewStatus.ACCEPTED]
+            docs = [d for d in docs if d.review_status == ReviewStatus.ACCEPTED and not d.assignment_pending]
         elif mode == "rejected":
             docs = [d for d in docs if d.review_status == ReviewStatus.REJECTED]
         threshold = self.svc.settings.low_confidence
         rows = []
         for d in docs:
-            tone = "warn" if d.review_status == ReviewStatus.NEEDS_REVIEW else (
+            tone = "warn" if d.review_status == ReviewStatus.NEEDS_REVIEW or d.assignment_pending else (
                 "ok" if d.review_status == ReviewStatus.ACCEPTED else "muted" if d.review_status == ReviewStatus.REJECTED else "")
             rows.append(Row([d.original_name, tr(f"doctype.{d.doc_type.value}"),
                              self.svc.organization.item_label(d.company_id, d.hotel_id),
                              Cell(f"{int(d.confidence * 100)} %", d.confidence, "right", "bad" if d.confidence < threshold else ""),
-                             Cell(tr(f"review.{d.review_status.value}"), tone=tone)], d.id))
+                             Cell(tr("docs.filter.unassigned") if d.assignment_pending else tr(f"review.{d.review_status.value}"), tone=tone)], d.id))
         keep = self.doc_id
         self.table.set_data([tr("doc.name"), tr("doc.type"), tr("org.hotel_company"), tr("doc.confidence"),
                             tr("doc.status")], rows, [150, 110, 140, 70, 90])

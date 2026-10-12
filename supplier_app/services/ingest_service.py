@@ -384,6 +384,7 @@ class IngestService(ServiceBase):
 
     def pending_documents(self) -> list[Document]:
         return self.repos.documents.list(assignment_pending=True)
+
     def _document_scope(self, review: ReviewData, result: ConfirmResult) -> tuple[int | None, int | None]:
         """Scope of the document: that of the booked invoice, else the one chosen in the form."""
         if result.invoice_id is not None:

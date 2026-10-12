@@ -37,7 +37,7 @@ KPI_ORDER = ["total_open", "overdue", "due_7", "due_14", "due_30", "paid_period"
 PERIODS = ["month", "quarter", "year", "custom"]
 ATTENTION = [("new_notices", "dash.attention.new_notices"), ("deadlines", "dash.attention.deadlines"),
              ("discrepancies", "dash.attention.discrepancies"), ("low_confidence", "dash.attention.low_confidence"),
-             ("duplicates", "dash.attention.duplicates"), ("credits", "dash.attention.credits")]
+             ("unassigned", "dash.attention.unassigned"), ("duplicates", "dash.attention.duplicates"), ("credits", "dash.attention.credits")]
 
 
 class DashboardPage(Page):

@@ -228,6 +228,62 @@ class InvoiceService(ServiceBase):
             self._audit("cancel", "invoice", invoice_id, reason)
         _ = invoice
 
+    @atomic
+    def change_supplier(self, invoice_id: int, supplier_id: int, reason: str = "") -> Invoice:
+        """Book an invoice under another supplier (it was assigned wrongly).
+
+        The ledger is append-only, so the booking is reversed under the old supplier and booked again under the new
+        one. That is only possible while nothing else hangs on the invoice (payments, credit notes, letters).
+        """
+        invoice = self.get(invoice_id)
+        if supplier_id == invoice.supplier_id:
+            return invoice
+        target = self.repos.parties.get(supplier_id)
+        if target is None or target.role == PartyRole.COLLECTION_AGENCY:
+            raise ValidationError("Bitte einen gültigen Lieferanten wählen.")
+        if invoice.status == InvoiceStatus.CANCELLED:
+            raise LedgerError("Eine stornierte Rechnung kann nicht umgebucht werden.")
+        entries = self.repos.ledger.list(invoice_id=invoice_id)
+        reversed_ids = {e.reverses_entry_id for e in entries if e.reverses_entry_id}
+        active = [e for e in entries if e.entry_type != LedgerEntryType.REVERSAL and e.id not in reversed_ids]
+        if len(active) != 1 or active[0].entry_type != LedgerEntryType.INVOICE:
+            raise LedgerError(
+                "Die Rechnung hat bereits Zahlungen oder weitere Buchungen. Bitte zuerst diese stornieren, "
+                "dann kann der Lieferant geändert werden.")
+        if self.repos.notices.list(invoice_id=invoice_id):
+            raise LedgerError("Zur Rechnung gibt es Mahnungen oder Schreiben. Der Lieferant kann nicht mehr geändert werden.")
+        if self.repos.invoices.get_by_number(supplier_id, invoice.invoice_number) is not None:
+            raise ValidationError(
+                f"Der Lieferant '{target.name}' hat bereits eine Rechnung mit der Nummer '{invoice.invoice_number}'.")
+        original = active[0]
+        old_name = self._party_name(invoice.supplier_id)
+        note = reason.strip() or f"Lieferant geändert: {old_name} → {target.name}"
+        with self.repos.transaction():
+            assert original.id is not None
+            self.ledger.reverse_entry(original.id, note, invoice.invoice_date)
+            self.repos.invoices.set_supplier(invoice_id, supplier_id)
+            self.ledger.post(
+                entry_date=invoice.invoice_date, supplier_id=supplier_id, entry_type=LedgerEntryType.INVOICE,
+                amount_cents=invoice.gross_cents, invoice_id=invoice_id, document_id=original.document_id,
+                comment=f"Rechnung {invoice.invoice_number}")
+            case = self.repos.cases.get_by_invoice(invoice_id)
+            if case is not None and case.id is not None:
+                self.repos.cases.set_supplier(case.id, supplier_id)
+                self.cases.add_event(case.id, "supplier", f"Lieferant geändert: {old_name} → {target.name}")
+            if original.document_id:
+                doc = self.repos.documents.get(original.document_id)
+                if doc is not None:
+                    doc.supplier_id = supplier_id
+                    self.repos.documents.update(doc)
+            self.ledger.refresh_status(invoice_id)
+            self._audit("change_supplier", "invoice", invoice_id, f"{old_name} -> {target.name}")
+        invoice.supplier_id = supplier_id
+        return invoice
+
+    def _party_name(self, party_id: int) -> str:
+        party = self.repos.parties.get(party_id)
+        return party.name if party else str(party_id)
+
     def _after_change(self, invoice_id: int) -> None:
         self.ledger.refresh_status(invoice_id)
         self.cases.sync_with_invoice(invoice_id)
